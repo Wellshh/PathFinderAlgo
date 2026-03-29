@@ -1,23 +1,22 @@
-package objects.impl;
+package pathfinder.model.node;
 
-import objects.BaseNode;
-import objects.Coordinate;
+import pathfinder.model.Point;
 
-public class AstarNode extends BaseNode implements Comparable<AstarNode> {
+public class AStarNode<P extends Point> extends BaseNode<P> implements Comparable<AStarNode<P>> {
 	/** Distance from start location to current location */
 	public double g = Double.POSITIVE_INFINITY;
 	/** Heuristic estimation of distance from current location to destination */
 	public double h = 0.0;
 	/** Pointer to **predecessor** */
-	public AstarNode parent = null; 
-	
-	public AstarNode(Coordinate pos) { super(pos); }
+	public AStarNode<P> parent = null;
+
+	public AStarNode(P pos) { super(pos); }
 	/** The added cost function */
 	public double getF() {return g + h; }
-	
+
 	@Override
-	public int compareTo(AstarNode other) {
+	public int compareTo(AStarNode<P> other) {
 		return Double.compare(this.getF(), other.getF());
 	}
-	
+
 }

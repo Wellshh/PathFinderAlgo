@@ -1,4 +1,4 @@
-package util;
+package pathfinder.util;
 
 public class UtilityFunc {
 	public static final double EPISILON = 1e-5;
