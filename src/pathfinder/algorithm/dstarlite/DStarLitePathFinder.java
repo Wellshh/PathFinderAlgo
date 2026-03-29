@@ -201,17 +201,17 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 			case EARLY_EXIT:
 			case PQ_EMPTY:
 			case SUCCESS:
-				System.out.printf("Path found -- compute return: %s", result);
+				System.out.printf("Path found -- compute return: %s \n", result);
 				break;
 			case MAX_STEPS_REACHED:
-				System.out.printf("Max steps reached -- compute return: %s", result);
+				System.out.printf("Max steps reached -- compute return: %s \n", result);
 				setPath(new O1PathContainer<>()); //empty path
 		}
 		
 		path = buildPathAlongGradient();
 		setPath(path);
 		if (path.isEmpty()){
-			System.out.println("No path found during buildPathAlongGradient!");
+			System.out.println("No path found during buildPathAlongGradient!\n");
 		}
 	}
 
