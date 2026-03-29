@@ -1,16 +1,21 @@
-package algo;
+package algo.dstar_lite;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import algo.BasePathFinder;
 import objects.Coordinate;
 import objects.Environment;
 import objects.impl.DstarLiteNode;
 import util.UtilityFunc;
 
 public class DStarLitePathFinder implements BasePathFinder {
+	/* The map */
 	private Environment env;
+	/* The planned path */
+	private List<Coordinate> path;
+	
 	/** An "open list" to store the "inconsistent" nodes*/
 	private PriorityQueue<DstarLiteNode> openList;
 	/** Sparsely store the explored nodes to save space*/
@@ -110,7 +115,7 @@ public class DStarLitePathFinder implements BasePathFinder {
 	@Override
 	public List<Coordinate> computePath() {
 		
-		return null;
+		return path;
 	}
 	
 	/**
@@ -177,28 +182,6 @@ public class DStarLitePathFinder implements BasePathFinder {
 			// if (u in U) U.Remove(u), as per [S. Koenig, 2002], takes O(n) time
 			if (!UtilityFunc.isClose(node.rhs, node.g)) insert(node);
 		}
-	}
-	
-	/** Poll valid node from PQ: 
-	 * 	valid means it's an up-to-date node in openHash.
-	 * 
-	 */
-	private DstarLiteNode pollValidNode(boolean canEarlyExit) {
-		while (!openList.isEmpty()) {
-			DstarLiteNode poppedSnapshot = openList.poll();
-			
-			// fetch the unique node on map
-			DstarLiteNode originalNode = getNodeOnMap(poppedSnapshot.pos);
-			KeyRecord latestKey = openHash.get(originalNode);
-			
-			// check if it's openHash (valid)
-			if (latestKey != null && latestKey.matches(poppedSnapshot)) {
-				openHash.remove(originalNode);
-				return originalNode;
-			}
-		}
-		
-		return null;
 	}
 	
 	/**

@@ -2,11 +2,11 @@ package objects;
 
 import java.util.List;
 
-public interface Environment {
-	double getTraversalCost(Coordinate from, Coordinate to);
-	double heuristic(Coordinate a, Coordinate b);
+public interface Environment<N> {
+	double getTraversalCost(N from, N to);
+	double heuristic(N a, N b);
 	
-	List<Coordinate> getNeighbors(Coordinate cur);
-	List<Coordinate> getSuccessors(Coordinate cur);
-	List<Coordinate> getPredecessors(Coordinate cur);
+	List<N> getNeighbors(N cur);
+	List<N> getSuccessors(N cur);
+	List<N> getPredecessors(N cur);
 }
