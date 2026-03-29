@@ -57,5 +57,17 @@ public class DstarLiteNode extends BaseNode implements Comparable<DstarLiteNode>
 		return Double.compare(this.k_bot, other.k_bot);
 	}
 	
+	public boolean lt(DstarLiteNode other) {
+		return this.compareTo(other) < 0;
+	}
+	
+	public boolean gt(DstarLiteNode other) {
+	    return this.compareTo(other) > 0;
+	}
+
+	public boolean eq(DstarLiteNode other) {
+	    return this.compareTo(other) == 0;
+	}
+	
 
 }

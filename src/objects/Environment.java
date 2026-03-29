@@ -4,6 +4,9 @@ import java.util.List;
 
 public interface Environment {
 	double getTraversalCost(Coordinate from, Coordinate to);
-	List<Coordinate> getNeighbors(Coordinate cur);
 	double heuristic(Coordinate a, Coordinate b);
+	
+	List<Coordinate> getNeighbors(Coordinate cur);
+	List<Coordinate> getSuccessors(Coordinate cur);
+	List<Coordinate> getPredecessors(Coordinate cur);
 }

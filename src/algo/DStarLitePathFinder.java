@@ -38,6 +38,10 @@ public class DStarLitePathFinder implements BasePathFinder {
 	
 	/** For double type comparison*/
 	private static final double EPISILON = 1e-5;
+	/** Stopping counts to avoid infinite loop */
+	private int maxSteps;
+	
+	
 	
 	/** Internal class for quick node snapshot*/
 	private static class KeyRecord {
@@ -49,12 +53,30 @@ public class DStarLitePathFinder implements BasePathFinder {
 		}
 	}
 	
-	public DStarLitePathFinder(Environment env) {
+	/** Internal enum class for return value of ComputeShortestPath
+	 *  - SUCCESS:  
+	 *  - FAIL: 
+	 *  - MAX_STEPS_REACHED: 
+	 *  - EARLY_EXIT: 
+	 * */
+	private enum ComputeReturn {
+		SUCCESS,
+		FAIL,
+		MAX_STEPS_REACHED,
+		EARLY_EXIT,
+	}
+	
+	public DStarLitePathFinder(Environment env, int maxSteps) {
 		this.env = env;
 		this.openList = new PriorityQueue<DstarLiteNode>((node1, node2) -> node1.compareTo(node2));
 		this.sparseMap = new HashMap<>();
 		this.openHash = new HashMap<>();
-		
+		this.maxSteps = maxSteps;
+	}
+	
+	/** Default Constructor*/
+	public DStarLitePathFinder() {
+		this.maxSteps = 80000;
 	}
 
 	@Override
@@ -69,9 +91,13 @@ public class DStarLitePathFinder implements BasePathFinder {
 		openHash.clear();
 		
 		DstarLiteNode goalNode = new DstarLiteNode(goal);
+		DstarLiteNode startNode = new DstarLiteNode(start);
 		goalNode.rhs = 0;
 		
+		
 		sparseMap.put(goal, goalNode);
+		// initialize all cost functions of start nodoe to heuristic focus
+		add2map(startNode);
 		
 		calculateKey(goalNode);
 		openHash.put(goalNode, new KeyRecord(goalNode.getKtop(), goalNode.getKbot()));
@@ -101,7 +127,9 @@ public class DStarLitePathFinder implements BasePathFinder {
 		});
 	}
 	
-	/** Get the node on map*/
+	/** Get the node on map,
+	 * this should be used a single reference of truth for nodes fetching
+	 * */
 	private DstarLiteNode getNodeOnMap (Coordinate pos) throws NullPointerException {
 		DstarLiteNode node = sparseMap.get(pos);
 		if (node == null) { 
@@ -113,7 +141,7 @@ public class DStarLitePathFinder implements BasePathFinder {
 	/** Calkey(s) as per in [S.Koenig, 2002]:
 	 * calculate k_top and k_bot.
 	 * */
-	private void calculateKey(DstarLiteNode node) {
+	private DstarLiteNode calculateKey(DstarLiteNode node) {
 		double min_val = Math.min(node.g, node.rhs);
 		// Inroduced in D* Lite V2:
 		// --- Originally we are supposed to subtract k_top by k_m 
@@ -122,6 +150,8 @@ public class DStarLitePathFinder implements BasePathFinder {
 		// --- we simply add k_m so that the relative orders in priority queue won't change.
 		node.setKtop(min_val + env.heuristic(node.pos, startPos) + k_m);
 		node.setKbot(min_val);
+		
+		return node;
 	}
 	
 	/** "Relax" the current node. 
@@ -134,7 +164,7 @@ public class DStarLitePathFinder implements BasePathFinder {
 		// the neighboring nodes were added into sparseMap before updateVertex
 		Coordinate curPos = node.pos;
 		if (curPos != goalPos) {
-			List<Coordinate> succs = env.getNeighbors(curPos);
+			List<Coordinate> succs = env.getSuccessors(curPos);
 			double newRHS = Double.POSITIVE_INFINITY;
 			for (Coordinate succ: succs) {
 				DstarLiteNode succNode = getNodeOnMap(succ);
@@ -149,6 +179,45 @@ public class DStarLitePathFinder implements BasePathFinder {
 		}
 	}
 	
+	/** Poll valid node from PQ: 
+	 * 	valid means it's an up-to-date node in openHash.
+	 * 
+	 */
+	private DstarLiteNode pollValidNode(boolean canEarlyExit) {
+		while (!openList.isEmpty()) {
+			DstarLiteNode poppedSnapshot = openList.poll();
+			
+			// fetch the unique node on map
+			DstarLiteNode originalNode = getNodeOnMap(poppedSnapshot.pos);
+			KeyRecord latestKey = openHash.get(originalNode);
+			
+			// check if it's openHash (valid)
+			if (latestKey != null && latestKey.matches(poppedSnapshot)) {
+				openHash.remove(originalNode);
+				return originalNode;
+			}
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * Check if a node is up-to-date in PQ or not by querying if it's in openHash.
+	 * @return the unique original node or null
+	 */
+	private DstarLiteNode isUp2Date(DstarLiteNode node) {
+		// fetch the unique node on map
+		DstarLiteNode originalNode = getNodeOnMap(node.pos);
+		KeyRecord latestKey = openHash.get(originalNode);
+		
+		if (latestKey != null
+				&& latestKey.matches(node)) {
+			openHash.remove(originalNode);
+			return originalNode;
+		}
+		return null;
+	}
+	
 	
 	// --------- Adapted from https://github.com/Wellshh/DStarLiteJava/blob/master/DStarLite.java,  -------- 
 	// @author daniel beard
@@ -160,9 +229,74 @@ public class DStarLitePathFinder implements BasePathFinder {
 		 * 		because this algorithm can plan forever if the start is surrounded by obstacles;
 		 * 		2. We lazily remove states from the open list so we never have to iterate through it.
 		 */
-		private void computeShortestPath() {
+		private ComputeReturn computeShortestPath() {
+			if (openList.isEmpty()) return ComputeReturn.FAIL;
+			
 			DstarLiteNode top_node_pq = openList.peek();
-			while (top_node_pq.)
+			DstarLiteNode startNode = getNodeOnMap(startPos);
+			
+			int loop_cnt = 0;
+			/** Three looping conditions:
+			 * 		1. list is not empty
+			 * 		2. topkeys in PQ is lower than that of start node: the current might not be optimal
+			 * 		3. start node is "inconsistent": new edge cost updated
+			 * 
+			 */
+			while (!openList.isEmpty()
+					&& top_node_pq.lt(calculateKey(startNode))
+					&& !UtilityFunc.isClose(startNode.g, startNode.rhs)) {
+				
+				if (loop_cnt ++ > maxSteps) {
+					//TODO: add logging layer
+					System.out.println("Maxsteps is reached during computeShortestPath!");
+					return ComputeReturn.MAX_STEPS_REACHED;
+				}
+				
+				boolean testCanEarlyExit = UtilityFunc.isClose(startNode.g, startNode.rhs);
+				
+				// lazy remove
+				// keep popping until an up-to-date node is found
+				DstarLiteNode up2date_node;
+				while(true) {
+					if (openList.isEmpty()) return ComputeReturn.FAIL;
+					up2date_node = isUp2Date(openList.poll());
+					if (up2date_node == null) continue;
+					
+					// early exit if loop stopping condition is met
+					if (up2date_node.lt(startNode) && testCanEarlyExit) return ComputeReturn.EARLY_EXIT;
+					break;
+				}
+				
+				// as per [S.Koenig, 2002], k_old is introduced in D* Lite v2
+				// used to check if robot moves && edge cost changes(map is updated)
+				
+				DstarLiteNode k_old = new DstarLiteNode(up2date_node);
+				if(k_old.lt(calculateKey(up2date_node))) {
+					// up2date_node is out of date :(
+					insert(up2date_node);
+				} else if (up2date_node.g > up2date_node.rhs) {
+					// node is overconsistent (may find shorter path)
+					setG(up2date_node, up2date_node.rhs);
+					
+					// update all predecessors
+					List<Coordinate> preds = env.getPredecessors(up2date_node.pos);
+					for (Coordinate pred: preds) {
+						updateVertex(new DstarLiteNode(pred));
+					}
+				} else {
+					// node is underconsistent (path becomes longer due to map updates)
+					setG(up2date_node, Double.POSITIVE_INFINITY);
+					List<Coordinate> preds = env.getPredecessors(up2date_node.pos);
+					// update all predecessors + current node
+					for (Coordinate pred: preds) {
+						updateVertex(new DstarLiteNode(pred));
+					}
+					updateVertex(up2date_node);
+				}
+			}
+			
+			// normal return -> looping condition met
+			return ComputeReturn.SUCCESS;
 		}
 
 	
@@ -174,7 +308,16 @@ public class DStarLitePathFinder implements BasePathFinder {
 			add2map(node);
 			DstarLiteNode tmp = getNodeOnMap(node.pos);
 			tmp.rhs = rhs;
-		}	
+		}
+		
+		/**
+		 * Sets the g value for node.
+		 */
+		private void setG(DstarLiteNode node, double g) {
+			add2map(node);
+			DstarLiteNode tmp = getNodeOnMap(node.pos);
+			tmp.g = g;
+		}
 		
 		/**
 		 * Checks if a node is in the map, if not it adds it in.
