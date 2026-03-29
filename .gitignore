@@ -1,3 +1,9 @@
+# Editor
+.vscode/
+.cursor/
+.DS_Store
+
+# Build
 bin/
 bin-test/
 lib/
