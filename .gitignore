@@ -1,0 +1,6 @@
+bin/
+.specstory/
+.settings/
+.classpath
+.project
+
