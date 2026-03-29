@@ -144,6 +144,16 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 		this(80000);
 	}
 
+	/**
+	 * Advances the algorithm's start position to the robot's current location.
+	 * Must be called before {@link #updateAllEdgeCosts} so that k_m is
+	 * adjusted correctly (D* Lite V2, [S. Koenig, 2002] line {20}).
+	 */
+	public void setStart(P newStart) {
+		this.startPos = newStart;
+		getOrCreateNode(newStart);
+	}
+
 	/** Setter of path */
 	public void setPath(O1PathContainer<P> path){
 		this.path = path;
@@ -247,13 +257,7 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 	 * **ONE AND ONLY** node instance.
 	 */
 	private DStarLiteNode<P> getOrCreateNode(P pos) {
-		return sparseMap.computeIfAbsent(pos, k -> {
-			DStarLiteNode<P> newNode = new DStarLiteNode<>(k);
-
-			// initial value of unexplored node has heuristic cost
-			newNode.g = newNode.rhs = env.heuristic(goalPos, pos);
-			return newNode;
-		});
+		return sparseMap.computeIfAbsent(pos, k -> new DStarLiteNode<>(k));
 	}
 
 	/** Get the node on map,
@@ -283,28 +287,28 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 		return node;
 	}
 
-	/** "Relax" the current node.
-	 * This function would only be called when:
-	 * 		1. when g(s) of its successor s is changed.
-	 * 		2. when edge costs changed, i.e. an new obstacle is encountered by the robot.
-	 * As per [S. Koenig, 2002]
+	/**
+	 * Relax the node at the given position.
+	 * Always operates on the canonical node stored in sparseMap so that
+	 * the consistency check (rhs vs g) reflects the true state.
+	 * As per [S. Koenig, 2002].
 	 */
 	private void updateVertex(DStarLiteNode<P> node) {
-		// the neighboring nodes were added into sparseMap before updateVertex
-		P curPos = node.pos;
+		DStarLiteNode<P> canonical = getOrCreateNode(node.pos);
+		P curPos = canonical.pos;
 		if (!curPos.equals(goalPos)) {
 			List<P> succs = env.getSuccessors(curPos);
 			double newRHS = Double.POSITIVE_INFINITY;
-			for (P succ: succs) {
-				DStarLiteNode<P> succNode = getNodeOnMap(succ);
-				double newRHSCandidate = env.getTraversalCost(succ, curPos) + succNode.g;
-				newRHS = Math.min(newRHSCandidate, newRHS);
+			for (P succ : succs) {
+				DStarLiteNode<P> succNode = getOrCreateNode(succ);
+				double candidate = env.getTraversalCost(succ, curPos) + succNode.g;
+				newRHS = Math.min(candidate, newRHS);
 			}
-			if (!UtilityFunc.isClose(newRHS, node.rhs)) setRHS(node, newRHS);
+			canonical.rhs = newRHS;
 
-			// instead of remove the outdated node in PQ, we add the update one in and check later
+			// Lazy-insert instead of remove+re-insert:
 			// if (u in U) U.Remove(u), as per [S. Koenig, 2002], takes O(n) time
-			if (!UtilityFunc.isClose(node.rhs, node.g)) insert(node);
+			if (!UtilityFunc.isClose(canonical.rhs, canonical.g)) insert(canonical);
 		}
 	}
 
@@ -339,83 +343,58 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 		private ComputeReturn computeShortestPath() {
 			if (openList.isEmpty()) return ComputeReturn.PQ_EMPTY;
 
-			DStarLiteNode<P> top_node_pq = openList.peek();
 			DStarLiteNode<P> startNode = getNodeOnMap(startPos);
-
 			int loop_cnt = 0;
-			/** Three looping conditions:
-			 * 		1. list is not empty
-			 * 		2. topkeys in PQ is lower than that of start node: the current might not be optimal
-			 * 		3. start node is "inconsistent": new edge cost updated
-			 *
-			 */
-			while (!openList.isEmpty()
-					&& top_node_pq.lt(calculateKey(startNode))
-					&& !UtilityFunc.isClose(startNode.g, startNode.rhs)) {
 
-				if (loop_cnt ++ > maxSteps) {
-					//TODO: add logging layer
+			/** Three looping conditions:
+             *      1. list is not empty
+             *      2. topkeys in PQ is lower than that of start node: the current might not be optimal
+             *      3. start node is "inconsistent": new edge cost updated
+             *
+             */
+			while (!openList.isEmpty()) {
+				calculateKey(startNode);
+				DStarLiteNode<P> topPQ = openList.peek();
+				boolean startConsistent = UtilityFunc.isClose(startNode.g, startNode.rhs);
+				if (!topPQ.lt(startNode) && startConsistent) break;
+
+				if (loop_cnt++ > maxSteps) {
 					System.out.println("Maxsteps is reached during computeShortestPath!");
 					return ComputeReturn.MAX_STEPS_REACHED;
 				}
 
-				boolean testCanEarlyExit = UtilityFunc.isClose(startNode.g, startNode.rhs);
-
-				// lazy remove
-				// keep popping until an up-to-date node is found
+				// Lazy removal: keep popping until an up-to-date node is found
 				DStarLiteNode<P> up2date_node;
-				while(true) {
+				while (true) {
 					if (openList.isEmpty()) return ComputeReturn.PQ_EMPTY;
 					up2date_node = isUp2Date(openList.poll());
-					if (up2date_node == null) continue;
-
-					// early exit if loop stopping condition is met
-					if (up2date_node.lt(startNode) && testCanEarlyExit) return ComputeReturn.EARLY_EXIT;
-					break;
+					if (up2date_node != null) break;
 				}
 
-				// as per [S.Koenig, 2002], k_old is introduced in D* Lite v2
-				// used to check if robot moves && edge cost changes(map is updated)
-
+				// k_old comparison (D* Lite v2: detects key changes from robot movement)
 				DStarLiteNode<P> k_old = new DStarLiteNode<>(up2date_node);
-				if(k_old.lt(calculateKey(up2date_node))) {
-					// up2date_node is out of date :(
+				if (k_old.lt(calculateKey(up2date_node))) {
 					insert(up2date_node);
 				} else if (up2date_node.g > up2date_node.rhs) {
-					// node is overconsistent (may find shorter path)
+					// Overconsistent: shorter path found
 					setG(up2date_node, up2date_node.rhs);
-
-					// update all predecessors
-					List<P> preds = env.getPredecessors(up2date_node.pos);
-					for (P pred: preds) {
-						updateVertex(new DStarLiteNode<>(pred));
+					for (P pred : env.getPredecessors(up2date_node.pos)) {
+						updateVertex(getOrCreateNode(pred));
 					}
 				} else {
-					// node is underconsistent (path becomes longer due to map updates)
+					// Underconsistent: path got longer due to edge cost increase
 					setG(up2date_node, Double.POSITIVE_INFINITY);
-					List<P> preds = env.getPredecessors(up2date_node.pos);
-					// update all predecessors + current node
-					for (P pred: preds) {
-						updateVertex(new DStarLiteNode<>(pred));
+					for (P pred : env.getPredecessors(up2date_node.pos)) {
+						updateVertex(getOrCreateNode(pred));
 					}
 					updateVertex(up2date_node);
 				}
 			}
 
-			// normal return -> looping condition met
 			return ComputeReturn.SUCCESS;
 		}
 
 
-
-		/**
-		 * Sets the rhs value for node.
-		 */
-		private void setRHS(DStarLiteNode<P> node, double rhs) {
-			add2map(node);
-			DStarLiteNode<P> tmp = getNodeOnMap(node.pos);
-			tmp.rhs = rhs;
-		}
 
 		/**
 		 * Sets the g value for node.
@@ -486,18 +465,30 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 	private O1PathContainer<P> buildPathAlongGradient(){
 		O1PathContainer<P> path = new O1PathContainer<>();
 		P current = startPos;
-		while (current != goalPos){
+		path.add(current);
+		int safetyCounter = 0;
+		while (!current.equals(goalPos)) {
+			if (safetyCounter++ > maxSteps) {
+				System.out.println("Max steps reached during buildPathAlongGradient!");
+				path.clear();
+				return path;
+			}
 			double minG = Double.POSITIVE_INFINITY;
-			for (P successor: env.getSuccessors(current)){
-				DStarLiteNode<P> successorNode = getNodeOnMap(successor);
-				if (successorNode.g < minG){
+			P next = null;
+			for (P successor : env.getSuccessors(current)) {
+				DStarLiteNode<P> successorNode = sparseMap.get(successor);
+				if (successorNode != null && successorNode.g < minG) {
 					minG = successorNode.g;
-					current = successor;
+					next = successor;
 				}
 			}
+			if (next == null || minG == Double.POSITIVE_INFINITY) {
+				path.clear();
+				return path;
+			}
+			current = next;
 			path.add(current);
 		}
-		path.add(goalPos);
 		return path;
 	}
 

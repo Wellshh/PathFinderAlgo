@@ -1,12 +1,17 @@
 package pathfinder.algorithm.astar;
 
-import java.util.List;
-
 import pathfinder.api.IPathFinder;
+import pathfinder.api.PathContainer;
 import pathfinder.model.Environment;
 import pathfinder.model.Point;
 
 public class AStarPathFinder<P extends Point> implements IPathFinder<P> {
+
+	@Override
+	public PathContainer<P> getPath() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
 	@Override
 	public void initialize(Environment<P> env, P start, P goal) {
@@ -20,9 +25,7 @@ public class AStarPathFinder<P extends Point> implements IPathFinder<P> {
 	}
 
 	@Override
-	public List<P> computePath() {
+	public void computePath() {
 		// TODO Auto-generated method stub
-		return null;
 	}
-
 }
