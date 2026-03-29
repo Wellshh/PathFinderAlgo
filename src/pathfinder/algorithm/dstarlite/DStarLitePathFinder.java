@@ -1,20 +1,81 @@
 package pathfinder.algorithm.dstarlite;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 
 import pathfinder.api.IDynamicPathFinder;
+import pathfinder.api.PathContainer;
+import pathfinder.model.EdgeUpdate;
 import pathfinder.model.Environment;
 import pathfinder.model.Point;
 import pathfinder.model.node.DStarLiteNode;
 import pathfinder.util.UtilityFunc;
 
+
+// ------------------------ Implementation of the PathContainer Interface
+
+/* Path container with O(1) next lookup by point. */
+class O1PathContainer<P extends Point> implements PathContainer<P>{
+	private final ArrayList<P> path = new ArrayList<>();
+	private final Map<P, Integer> firstIndexByPoint = new HashMap<>();
+
+	@Override
+	public void add(P point) {
+		firstIndexByPoint.putIfAbsent(point, path.size());
+		path.add(point);
+	}
+
+	@Override
+	public P get(int index) {
+		return path.get(index);
+	}
+
+	@Override
+	public P next(P current) {
+		Integer firstIndex = firstIndexByPoint.get(current);
+		if (firstIndex == null) {
+			return null;
+		}
+		int nextIndex = firstIndex + 1;
+		if (nextIndex >= path.size()) {
+			return null;
+		}
+		return path.get(nextIndex);
+	}
+
+	@Override
+	public int size() {
+		return path.size();
+	}
+
+	@Override
+	public boolean isEmpty() {
+		return path.isEmpty();
+	}
+
+
+	@Override
+	public void clear() {
+		path.clear();
+		firstIndexByPoint.clear();
+	}
+
+	@Override
+	public List<P> toList() {
+		return new ArrayList<>(path);
+	}
+}
+
+// ------------------------
+
 public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<P> {
 	/* The map */
 	private Environment<P> env;
 	/* The planned path */
-	private List<P> path;
+	private O1PathContainer<P> path = new O1PathContainer<>();
 
 	/** An "open list" to store the "inconsistent" nodes*/
 	private PriorityQueue<DStarLiteNode<P>> openList;
@@ -60,13 +121,13 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 
 	/** Internal enum class for return value of ComputeShortestPath
 	 *  - SUCCESS:
-	 *  - FAIL:
+	 *  - PQ_EMPTY:
 	 *  - MAX_STEPS_REACHED:
 	 *  - EARLY_EXIT:
 	 * */
 	private enum ComputeReturn {
 		SUCCESS,
-		FAIL,
+		PQ_EMPTY,
 		MAX_STEPS_REACHED,
 		EARLY_EXIT,
 	}
@@ -81,6 +142,17 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 	/** Default Constructor*/
 	public DStarLitePathFinder() {
 		this(80000);
+	}
+
+	/** Setter of path */
+	public void setPath(O1PathContainer<P> path){
+		this.path = path;
+	}
+
+	/** Getter of path container */
+	@Override
+	public PathContainer<P> getPath() {
+		return path;
 	}
 
 	@Override
@@ -111,27 +183,63 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 
 	}
 
-
+	/* Compute the shortest path from start to goal */
 	@Override
-	public List<P> computePath() {
-		// TODO: implement full path extraction
-		return path;
+	public void computePath() {
+		ComputeReturn result = computeShortestPath();
+		switch (result) {
+			case EARLY_EXIT:
+			case PQ_EMPTY:
+			case SUCCESS:
+				System.out.printf("Path found -- compute return: %s", result);
+				break;
+			case MAX_STEPS_REACHED:
+				System.out.printf("Max steps reached -- compute return: %s", result);
+				setPath(new O1PathContainer<>()); //empty path
+		}
+		
+		path = buildPathAlongGradient();
+		setPath(path);
+		if (path.isEmpty()){
+			System.out.println("No path found during buildPathAlongGradient!");
+		}
 	}
 
+	/** Get the next waypoint from the path */
 	@Override
 	public P getNextWaypoint(P current) {
-		// TODO: implement single-step waypoint retrieval
-		return null;
+		if (path.isEmpty()) return null;
+		return path.next(current);
 	}
 
+	/**
+	 * Batch update: adjust k_m once per sensing cycle, then propagate each edge change.
+	 * As per [S. Koenig, 2002] - the main loop's edge-scanning phase.
+	 */
 	@Override
-	public void notifyEdgeCostChange(P u, P v, double newCost) {
-		// TODO: implement edge cost update and incremental replanning
+	public void updateAllEdgeCosts(List<EdgeUpdate<P>> edgeUpdates) {
+		if (edgeUpdates.isEmpty()) return;
+
+		k_m += env.heuristic(lastPos, startPos);
+		lastPos = startPos;
+
+		for (EdgeUpdate<P> eu : edgeUpdates) {
+			notifyEdgeCostChange(eu.from, eu.to, eu.newCost);
+		}
 	}
 
+	/**
+	 * Single edge update: write the new cost into the environment,
+	 * then propagate the inconsistency through updateVertex.
+	 */
 	@Override
-	public void updateGoal(P newGoal) {
-		// TODO: implement dynamic goal relocation
+	public void notifyEdgeCostChange(P from, P to, double newCost) {
+		env.setTraversalCost(from, to, newCost);
+
+		DStarLiteNode<P> fromNode = getOrCreateNode(from);
+		// put to node on map for successors update
+		getOrCreateNode(to);
+		updateVertex(fromNode);
 	}
 
 	/**
@@ -229,7 +337,7 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 		 * 		2. We lazily remove states from the open list so we never have to iterate through it.
 		 */
 		private ComputeReturn computeShortestPath() {
-			if (openList.isEmpty()) return ComputeReturn.FAIL;
+			if (openList.isEmpty()) return ComputeReturn.PQ_EMPTY;
 
 			DStarLiteNode<P> top_node_pq = openList.peek();
 			DStarLiteNode<P> startNode = getNodeOnMap(startPos);
@@ -257,7 +365,7 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 				// keep popping until an up-to-date node is found
 				DStarLiteNode<P> up2date_node;
 				while(true) {
-					if (openList.isEmpty()) return ComputeReturn.FAIL;
+					if (openList.isEmpty()) return ComputeReturn.PQ_EMPTY;
 					up2date_node = isUp2Date(openList.poll());
 					if (up2date_node == null) continue;
 
@@ -341,6 +449,57 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 			DStarLiteNode<P> copied = new DStarLiteNode<>(node);
 			openList.add(copied);
 		}
+
+	/**
+	 * Dynamically relocate the goal without a full re-initialization.
+	 *
+	 * Adapted from the reference approach (daniel beard's D* Lite):
+	 * The reference stores traversal costs inside cellHash, so it must
+	 * save non-default-cost cells before clearing, then re-add them.
+	 * In our architecture, costs live in {@link Environment} and survive
+	 * the reset, so the save-and-restore step is unnecessary.
+	 */
+	@Override
+	public void updateGoal(P newGoal) {
+		sparseMap.clear();
+		openHash.clear();
+		openList.clear();
+		k_m = 0;
+
+		this.goalPos = newGoal;
+		this.lastPos = startPos;
+
+		DStarLiteNode<P> goalNode = new DStarLiteNode<>(newGoal);
+		goalNode.rhs = 0;
+		sparseMap.put(newGoal, goalNode);
+
+		add2map(new DStarLiteNode<>(startPos));
+
+		calculateKey(goalNode);
+		openHash.put(goalNode, new KeyRecord(goalNode.getKtop(), goalNode.getKbot()));
+		openList.add(goalNode);
+
+		path.clear();
+	}
+
+	/** Construct the shortest path along the gradient of g value */
+	private O1PathContainer<P> buildPathAlongGradient(){
+		O1PathContainer<P> path = new O1PathContainer<>();
+		P current = startPos;
+		while (current != goalPos){
+			double minG = Double.POSITIVE_INFINITY;
+			for (P successor: env.getSuccessors(current)){
+				DStarLiteNode<P> successorNode = getNodeOnMap(successor);
+				if (successorNode.g < minG){
+					minG = successorNode.g;
+					current = successor;
+				}
+			}
+			path.add(current);
+		}
+		path.add(goalPos);
+		return path;
+	}
 
 	// -----------------------
 

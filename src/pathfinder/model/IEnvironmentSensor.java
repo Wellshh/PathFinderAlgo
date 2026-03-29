@@ -3,7 +3,7 @@ package pathfinder.model;
 import java.util.List;
 
 /**
- * Represents the perception capability of an agent.
+ * Represents the perception capability of an agent/robot.
  * Scans the environment and reports edge cost changes relative to the agent's prior knowledge.
  * @param <P> the spatial coordinate type
  */

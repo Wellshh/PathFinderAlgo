@@ -1,7 +1,5 @@
 package pathfinder.api;
 
-import java.util.List;
-
 import pathfinder.model.Environment;
 import pathfinder.model.Point;
 
@@ -10,6 +8,9 @@ import pathfinder.model.Point;
  * @param <P> the spatial coordinate type
  */
 public interface IPathFinder<P extends Point> {
+
+	/** Path container to store the path */
+	PathContainer<P> getPath();
 
 	/**
 	 * Initializes the planner with the environment topology, start, and goal.
@@ -23,7 +24,7 @@ public interface IPathFinder<P extends Point> {
 	P getNextWaypoint(P current);
 
 	/**
-	 * Computes and returns the full path from start to goal.
+	 * Computes the full path from start to goal, update the internal path data structure.
 	 */
-	List<P> computePath();
+	void computePath();
 }
