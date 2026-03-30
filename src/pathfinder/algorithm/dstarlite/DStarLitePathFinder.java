@@ -1,72 +1,17 @@
 package pathfinder.algorithm.dstarlite;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
+
 import pathfinder.api.IDynamicPathFinder;
 import pathfinder.api.PathContainer;
+import pathfinder.api.PathContainer.O1PathContainer;
 import pathfinder.model.EdgeUpdate;
 import pathfinder.model.Environment;
 import pathfinder.model.Point;
 import pathfinder.model.node.DStarLiteNode;
 import pathfinder.util.UtilityFunc;
-
-// ------------------------ Implementation of the PathContainer Interface
-
-/* Path container with O(1) next lookup by point. */
-class O1PathContainer<P extends Point> implements PathContainer<P> {
-  private final ArrayList<P> path = new ArrayList<>();
-  private final Map<P, Integer> firstIndexByPoint = new HashMap<>();
-
-  @Override
-  public void add(P point) {
-    firstIndexByPoint.putIfAbsent(point, path.size());
-    path.add(point);
-  }
-
-  @Override
-  public P get(int index) {
-    return path.get(index);
-  }
-
-  @Override
-  public P next(P current) {
-    Integer firstIndex = firstIndexByPoint.get(current);
-    if (firstIndex == null) {
-      return null;
-    }
-    int nextIndex = firstIndex + 1;
-    if (nextIndex >= path.size()) {
-      return null;
-    }
-    return path.get(nextIndex);
-  }
-
-  @Override
-  public int size() {
-    return path.size();
-  }
-
-  @Override
-  public boolean isEmpty() {
-    return path.isEmpty();
-  }
-
-  @Override
-  public void clear() {
-    path.clear();
-    firstIndexByPoint.clear();
-  }
-
-  @Override
-  public List<P> toList() {
-    return new ArrayList<>(path);
-  }
-}
-
-// ------------------------
 
 public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<P> {
   /* The map */
@@ -81,9 +26,12 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
   private HashMap<P, DStarLiteNode<P>> sparseMap;
 
   /**
-   * Assist priority queue for lazy removal of outdated nodes: `PriorityQueue.remove()` in java
-   * costs O(n) time in average, instead of removing the outdated node, we insert the same node with
-   * updated key value and later poll() the old nodes with the help of the hashmap.
+   * Assist priority queue for lazy removal of outdated nodes:
+   * `PriorityQueue.remove()` in java
+   * costs O(n) time in average, instead of removing the outdated node, we insert
+   * the same node with
+   * updated key value and later poll() the old nodes with the help of the
+   * hashmap.
    */
   private HashMap<DStarLiteNode<P>, KeyRecord> openHash;
 
@@ -95,7 +43,10 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
   /** For k_m: the heuristic difference */
   private P lastPos;
 
-  /** Key modifier introduced in second version of D* Lite Algorithm, as per [S. Koenig, 2002]. */
+  /**
+   * Key modifier introduced in second version of D* Lite Algorithm, as per [S.
+   * Koenig, 2002].
+   */
   private double k_m = 0.0;
 
   /** For double type comparison */
@@ -120,7 +71,8 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
   }
 
   /**
-   * Internal enum class for return value of ComputeShortestPath - SUCCESS: - PQ_EMPTY: -
+   * Internal enum class for return value of ComputeShortestPath - SUCCESS: -
+   * PQ_EMPTY: -
    * MAX_STEPS_REACHED: - EARLY_EXIT:
    */
   private enum ComputeReturn {
@@ -143,8 +95,10 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
   }
 
   /**
-   * Advances the algorithm's start position to the robot's current location. Must be called before
-   * {@link #updateAllEdgeCosts} so that k_m is adjusted correctly (D* Lite V2, [S. Koenig, 2002]
+   * Advances the algorithm's start position to the robot's current location. Must
+   * be called before
+   * {@link #updateAllEdgeCosts} so that k_m is adjusted correctly (D* Lite V2,
+   * [S. Koenig, 2002]
    * line {20}).
    */
   public void setStart(P newStart) {
@@ -213,17 +167,20 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
   /** Get the next waypoint from the path */
   @Override
   public P getNextWaypoint(P current) {
-    if (path.isEmpty()) return null;
+    if (path.isEmpty())
+      return null;
     return path.next(current);
   }
 
   /**
-   * Batch update: adjust k_m once per sensing cycle, then propagate each edge change. As per [S.
+   * Batch update: adjust k_m once per sensing cycle, then propagate each edge
+   * change. As per [S.
    * Koenig, 2002] - the main loop's edge-scanning phase.
    */
   @Override
   public void updateAllEdgeCosts(List<EdgeUpdate<P>> edgeUpdates) {
-    if (edgeUpdates.isEmpty()) return;
+    if (edgeUpdates.isEmpty())
+      return;
 
     k_m += env.heuristic(lastPos, startPos);
     lastPos = startPos;
@@ -234,7 +191,8 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
   }
 
   /**
-   * Single edge update: write the new cost into the environment, then propagate the inconsistency
+   * Single edge update: write the new cost into the environment, then propagate
+   * the inconsistency
    * through updateVertex.
    */
   @Override
@@ -248,14 +206,18 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
   }
 
   /**
-   * Safely return a node to ensure each coordinate on map corresponds to **ONE AND ONLY** node
+   * Safely return a node to ensure each coordinate on map corresponds to **ONE
+   * AND ONLY** node
    * instance.
    */
   private DStarLiteNode<P> getOrCreateNode(P pos) {
     return sparseMap.computeIfAbsent(pos, k -> new DStarLiteNode<>(k));
   }
 
-  /** Get the node on map, this should be used a single reference of truth for nodes fetching */
+  /**
+   * Get the node on map, this should be used a single reference of truth for
+   * nodes fetching
+   */
   private DStarLiteNode<P> getNodeOnMap(P pos) throws NullPointerException {
     DStarLiteNode<P> node = sparseMap.get(pos);
     if (node == null) {
@@ -270,9 +232,11 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
     double min_val = Math.min(node.g, node.rhs);
     // Inroduced in D* Lite V2:
     // --- Originally we are supposed to subtract k_top by k_m
-    // --- everytime the robot moves but we intentionally "leave" it to avoid scanning
+    // --- everytime the robot moves but we intentionally "leave" it to avoid
+    // scanning
     // --- through the whole openList. So everytime a newly updated node is added,
-    // --- we simply add k_m so that the relative orders in priority queue won't change.
+    // --- we simply add k_m so that the relative orders in priority queue won't
+    // change.
     node.setKtop(min_val + env.heuristic(node.pos, startPos) + k_m);
     node.setKbot(min_val);
 
@@ -280,8 +244,10 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
   }
 
   /**
-   * Relax the node at the given position. Always operates on the canonical node stored in sparseMap
-   * so that the consistency check (rhs vs g) reflects the true state. As per [S. Koenig, 2002].
+   * Relax the node at the given position. Always operates on the canonical node
+   * stored in sparseMap
+   * so that the consistency check (rhs vs g) reflects the true state. As per [S.
+   * Koenig, 2002].
    */
   private void updateVertex(DStarLiteNode<P> node) {
     DStarLiteNode<P> canonical = getOrCreateNode(node.pos);
@@ -298,7 +264,8 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
 
       // Lazy-insert instead of remove+re-insert:
       // if (u in U) U.Remove(u), as per [S. Koenig, 2002], takes O(n) time
-      if (!UtilityFunc.isClose(canonical.rhs, canonical.g)) insert(canonical);
+      if (!UtilityFunc.isClose(canonical.rhs, canonical.g))
+        insert(canonical);
     }
   }
 
@@ -319,32 +286,41 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
     return null;
   }
 
-  // --------- Adapted from https://github.com/Wellshh/DStarLiteJava/blob/master/DStarLite.java,
+  // --------- Adapted from
+  // https://github.com/Wellshh/DStarLiteJava/blob/master/DStarLite.java,
   // --------
   // @author daniel beard
 
   /**
-   * Back propagate from goal to start, update cost functions along the way. As per [S. Koenig,
-   * 2002] - ComputeShortestPath() except for two main modifications: 1. We stop planning after a
-   * number of steps, 'maxsteps' we do this because this algorithm can plan forever if the start is
-   * surrounded by obstacles; 2. We lazily remove states from the open list so we never have to
+   * Back propagate from goal to start, update cost functions along the way. As
+   * per [S. Koenig,
+   * 2002] - ComputeShortestPath() except for two main modifications: 1. We stop
+   * planning after a
+   * number of steps, 'maxsteps' we do this because this algorithm can plan
+   * forever if the start is
+   * surrounded by obstacles; 2. We lazily remove states from the open list so we
+   * never have to
    * iterate through it.
    */
   private ComputeReturn computeShortestPath() {
-    if (openList.isEmpty()) return ComputeReturn.PQ_EMPTY;
+    if (openList.isEmpty())
+      return ComputeReturn.PQ_EMPTY;
 
     DStarLiteNode<P> startNode = getNodeOnMap(startPos);
     int loop_cnt = 0;
 
     /**
-     * Three looping conditions: 1. list is not empty 2. topkeys in PQ is lower than that of start
-     * node: the current might not be optimal 3. start node is "inconsistent": new edge cost updated
+     * Three looping conditions: 1. list is not empty 2. topkeys in PQ is lower than
+     * that of start
+     * node: the current might not be optimal 3. start node is "inconsistent": new
+     * edge cost updated
      */
     while (!openList.isEmpty()) {
       calculateKey(startNode);
       DStarLiteNode<P> topPQ = openList.peek();
       boolean startConsistent = UtilityFunc.isClose(startNode.g, startNode.rhs);
-      if (!topPQ.lt(startNode) && startConsistent) break;
+      if (!topPQ.lt(startNode) && startConsistent)
+        break;
 
       if (loop_cnt++ > maxSteps) {
         System.out.println("Maxsteps is reached during computeShortestPath!");
@@ -354,9 +330,11 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
       // Lazy removal: keep popping until an up-to-date node is found
       DStarLiteNode<P> up2date_node;
       while (true) {
-        if (openList.isEmpty()) return ComputeReturn.PQ_EMPTY;
+        if (openList.isEmpty())
+          return ComputeReturn.PQ_EMPTY;
         up2date_node = isUp2Date(openList.poll());
-        if (up2date_node != null) break;
+        if (up2date_node != null)
+          break;
       }
 
       // k_old comparison (D* Lite v2: detects key changes from robot movement)
@@ -412,9 +390,13 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
   /**
    * Dynamically relocate the goal without a full re-initialization.
    *
-   * <p>Adapted from the reference approach (daniel beard's D* Lite): The reference stores traversal
-   * costs inside cellHash, so it must save non-default-cost cells before clearing, then re-add
-   * them. In our architecture, costs live in {@link Environment} and survive the reset, so the
+   * <p>
+   * Adapted from the reference approach (daniel beard's D* Lite): The reference
+   * stores traversal
+   * costs inside cellHash, so it must save non-default-cost cells before
+   * clearing, then re-add
+   * them. In our architecture, costs live in {@link Environment} and survive the
+   * reset, so the
    * save-and-restore step is unnecessary.
    */
   @Override
