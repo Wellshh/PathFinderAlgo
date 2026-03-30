@@ -3,32 +3,46 @@ package pathfinder.visualizer;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import pathfinder.model.Point2D;
+import pathfinder.visualizer.model.AlgorithmStateLayer;
+import pathfinder.visualizer.model.BaseMapLayer;
+import pathfinder.visualizer.model.MapCellState;
+import pathfinder.visualizer.model.RobotEntity;
 
 /**
- * Observable grid model that serves as the single source of truth for Canvas rendering. Tracks
- * per-cell dirty flags so the renderer can perform incremental redraws instead of full-screen
- * clears.
+ * Observable grid model backed by a multi-layer architecture. Serves as the single source of truth
+ * for all rendering.
  *
- * <p>Thread-safety: mutation methods are {@code synchronized} because the algorithm worker thread
- * writes state while the JavaFX Application Thread reads it via {@link #consumeDirtySet()}.
+ * <p>Internally delegates to {@link BaseMapLayer} (obstacles, start, goal) and zero or more
+ * {@link AlgorithmStateLayer}s (one per algorithm). A backward-compatible facade using legacy
+ * {@link CellState} is retained so existing callers compile unchanged.
+ *
+ * <p>Thread-safety: mutation methods are {@code synchronized}.
  */
 public class GridViewModel {
 
   private final int width;
   private final int height;
-  private final CellState[][] cells;
-  private final BitSet dirtyFlags;
+
+  private final BaseMapLayer baseLayer;
+  private final List<AlgorithmStateLayer> algoLayers = new CopyOnWriteArrayList<>();
+  private final List<RobotEntity> robots = new CopyOnWriteArrayList<>();
+
+  // Legacy flat view kept in sync for backward compatibility
+  private final CellState[][] legacyCells;
+  private final BitSet legacyDirtyFlags;
 
   public GridViewModel(int width, int height) {
     this.width = width;
     this.height = height;
-    this.cells = new CellState[height][width];
-    this.dirtyFlags = new BitSet(width * height);
+    this.baseLayer = new BaseMapLayer(width, height);
+    this.legacyCells = new CellState[height][width];
+    this.legacyDirtyFlags = new BitSet(width * height);
 
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
-        cells[y][x] = CellState.FREE;
+        legacyCells[y][x] = CellState.FREE;
       }
     }
   }
@@ -41,93 +55,168 @@ public class GridViewModel {
     return height;
   }
 
-  /**
-   * Returns the state without synchronization — safe when called from the FX thread after {@link
-   * #consumeDirtySet()} has been obtained.
-   */
-  public CellState getCellState(int x, int y) {
-    return cells[y][x];
+  // -------------------- Layer access (new API) --------------------
+
+  public BaseMapLayer getBaseLayer() {
+    return baseLayer;
   }
 
+  public List<AlgorithmStateLayer> getAlgoLayers() {
+    return algoLayers;
+  }
+
+  public AlgorithmStateLayer addAlgorithmLayer(String algorithmId, int colorArgb) {
+    AlgorithmStateLayer layer = new AlgorithmStateLayer(algorithmId, width, height, colorArgb);
+    algoLayers.add(layer);
+    return layer;
+  }
+
+  public AlgorithmStateLayer getAlgorithmLayer(String algorithmId) {
+    for (AlgorithmStateLayer layer : algoLayers) {
+      if (layer.getAlgorithmId().equals(algorithmId)) {
+        return layer;
+      }
+    }
+    return null;
+  }
+
+  // -------------------- Robot entities --------------------
+
+  public List<RobotEntity> getRobots() {
+    return robots;
+  }
+
+  public RobotEntity addRobot(String id, int colorArgb, double startX, double startY) {
+    RobotEntity robot = new RobotEntity(id, colorArgb, startX, startY);
+    robots.add(robot);
+    return robot;
+  }
+
+  public RobotEntity getRobot(String id) {
+    for (RobotEntity r : robots) {
+      if (r.getId().equals(id)) return r;
+    }
+    return null;
+  }
+
+  // -------------------- Legacy facade (backward compat) --------------------
+
+  /**
+   * @deprecated Use {@link BaseMapLayer} and {@link AlgorithmStateLayer} directly.
+   */
+  @Deprecated
+  public CellState getCellState(int x, int y) {
+    return legacyCells[y][x];
+  }
+
+  /**
+   * @deprecated Use layer-specific setters instead.
+   */
+  @Deprecated
   public synchronized void setCellState(int x, int y, CellState state) {
-    if (cells[y][x] != state) {
-      cells[y][x] = state;
-      dirtyFlags.set(y * width + x);
+    if (legacyCells[y][x] != state) {
+      legacyCells[y][x] = state;
+      legacyDirtyFlags.set(y * width + x);
+
+      syncToBaseLayer(x, y, state);
     }
   }
 
   /**
-   * Atomically returns all dirty indices and clears the internal set. The caller iterates the
-   * returned BitSet to repaint only changed cells.
+   * @deprecated The layered model has per-layer dirty sets. Use layer-specific consumeDirtySet().
    */
+  @Deprecated
   public synchronized BitSet consumeDirtySet() {
-    BitSet snapshot = (BitSet) dirtyFlags.clone();
-    dirtyFlags.clear();
+    BitSet snapshot = (BitSet) legacyDirtyFlags.clone();
+    legacyDirtyFlags.clear();
     return snapshot;
   }
 
-  /** Marks every cell as dirty so the next render frame repaints the full grid. */
   public synchronized void markAllDirty() {
-    dirtyFlags.set(0, width * height);
+    legacyDirtyFlags.set(0, width * height);
+    baseLayer.markAllDirty();
+    for (AlgorithmStateLayer layer : algoLayers) {
+      layer.markAllDirty();
+    }
   }
 
-  // -------------------- Bulk update helpers --------------------
+  // -------------------- Legacy bulk update helpers --------------------
 
   /**
-   * Clears all PATH cells back to FREE, then marks the new path. Only changed cells become dirty —
-   * avoids redundant repaints.
+   * @deprecated Use {@link AlgorithmStateLayer#updatePath(List)} instead.
    */
+  @Deprecated
   public synchronized void updatePath(List<Point2D> path) {
-    clearState(CellState.PATH);
+    clearLegacyState(CellState.PATH);
     if (path != null) {
       for (Point2D p : path) {
-        if (inBounds(p.x, p.y) && cells[p.y][p.x] == CellState.FREE) {
-          cells[p.y][p.x] = CellState.PATH;
-          dirtyFlags.set(p.y * width + p.x);
+        if (inBounds(p.x, p.y) && legacyCells[p.y][p.x] == CellState.FREE) {
+          legacyCells[p.y][p.x] = CellState.PATH;
+          legacyDirtyFlags.set(p.y * width + p.x);
         }
       }
     }
   }
 
-  /** Replaces OPEN_LIST / CLOSED_LIST cells with the new sets. */
+  /**
+   * @deprecated Use {@link AlgorithmStateLayer#updateSearchProgress(Collection, Collection)}.
+   */
+  @Deprecated
   public synchronized void updateSearchProgress(
       Collection<Point2D> openList, Collection<Point2D> closedList) {
-    clearState(CellState.OPEN_LIST);
-    clearState(CellState.CLOSED_LIST);
+    clearLegacyState(CellState.OPEN_LIST);
+    clearLegacyState(CellState.CLOSED_LIST);
     if (closedList != null) {
       for (Point2D p : closedList) {
-        if (inBounds(p.x, p.y) && cells[p.y][p.x] == CellState.FREE) {
-          cells[p.y][p.x] = CellState.CLOSED_LIST;
-          dirtyFlags.set(p.y * width + p.x);
+        if (inBounds(p.x, p.y) && legacyCells[p.y][p.x] == CellState.FREE) {
+          legacyCells[p.y][p.x] = CellState.CLOSED_LIST;
+          legacyDirtyFlags.set(p.y * width + p.x);
         }
       }
     }
     if (openList != null) {
       for (Point2D p : openList) {
-        if (inBounds(p.x, p.y) && cells[p.y][p.x] == CellState.FREE) {
-          cells[p.y][p.x] = CellState.OPEN_LIST;
-          dirtyFlags.set(p.y * width + p.x);
+        if (inBounds(p.x, p.y) && legacyCells[p.y][p.x] == CellState.FREE) {
+          legacyCells[p.y][p.x] = CellState.OPEN_LIST;
+          legacyDirtyFlags.set(p.y * width + p.x);
         }
       }
     }
   }
 
+  /**
+   * @deprecated Use {@link pathfinder.visualizer.model.RobotEntity} instead.
+   */
+  @Deprecated
   public synchronized void setRobotPosition(Point2D pos) {
-    clearState(CellState.ROBOT);
+    clearLegacyState(CellState.ROBOT);
     if (pos != null && inBounds(pos.x, pos.y)) {
-      cells[pos.y][pos.x] = CellState.ROBOT;
-      dirtyFlags.set(pos.y * width + pos.x);
+      legacyCells[pos.y][pos.x] = CellState.ROBOT;
+      legacyDirtyFlags.set(pos.y * width + pos.x);
     }
   }
 
   // -------------------- Internal helpers --------------------
 
-  private void clearState(CellState target) {
+  private void syncToBaseLayer(int x, int y, CellState state) {
+    switch (state) {
+      case FREE -> baseLayer.setState(x, y, MapCellState.FREE);
+      case OBSTACLE -> baseLayer.setState(x, y, MapCellState.OBSTACLE);
+      case START -> baseLayer.setState(x, y, MapCellState.START);
+      case GOAL -> baseLayer.setState(x, y, MapCellState.GOAL);
+      default -> {
+        // Algorithm-specific states (PATH, OPEN_LIST, CLOSED_LIST, ROBOT)
+        // are overlays and do not affect the base layer.
+      }
+    }
+  }
+
+  private void clearLegacyState(CellState target) {
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
-        if (cells[y][x] == target) {
-          cells[y][x] = CellState.FREE;
-          dirtyFlags.set(y * width + x);
+        if (legacyCells[y][x] == target) {
+          legacyCells[y][x] = CellState.FREE;
+          legacyDirtyFlags.set(y * width + x);
         }
       }
     }

@@ -1,11 +1,15 @@
 module PathFinderAlgo {
+  requires transitive javafx.base;
   requires javafx.controls;
   requires javafx.graphics;
 
   exports pathfinder.api;
+  exports pathfinder.engine;
   exports pathfinder.model;
   exports pathfinder.model.node;
   exports pathfinder.visualizer;
+  exports pathfinder.visualizer.model;
+  exports pathfinder.visualizer.adapter;
   exports pathfinder.visualizer.javafx;
   exports pathfinder.testenv.environment;
   exports pathfinder.testenv.sensor;

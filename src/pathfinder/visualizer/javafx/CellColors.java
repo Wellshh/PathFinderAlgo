@@ -24,10 +24,31 @@ public final class CellColors {
     FREE, OBSTACLE, START, GOAL, PATH, OPEN_LIST, CLOSED_LIST, ROBOT
   };
 
+  private static final int[] ARGB_LOOKUP = new int[LOOKUP.length];
+
+  static {
+    for (int i = 0; i < LOOKUP.length; i++) {
+      ARGB_LOOKUP[i] = colorToArgb(LOOKUP[i]);
+    }
+  }
+
   private CellColors() {}
 
   /** O(1) lookup — no allocation, no branching. */
   public static Color forState(CellState state) {
     return LOOKUP[state.ordinal()];
+  }
+
+  /** O(1) packed-ARGB lookup for use with {@link pathfinder.visualizer.adapter.IGraphicsAdapter}. */
+  public static int argbForState(CellState state) {
+    return ARGB_LOOKUP[state.ordinal()];
+  }
+
+  private static int colorToArgb(Color c) {
+    int a = (int) (c.getOpacity() * 255);
+    int r = (int) (c.getRed() * 255);
+    int g = (int) (c.getGreen() * 255);
+    int b = (int) (c.getBlue() * 255);
+    return (a << 24) | (r << 16) | (g << 8) | b;
   }
 }

@@ -45,7 +45,8 @@ spotless {
 
 application {
     mainModule = 'PathFinderAlgo'
-    mainClass = 'pathfinder.visualizer.javafx.DStarLiteDemo'
+    // mainClass = 'pathfinder.visualizer.javafx.DStarLiteDemo'
+    mainClass = 'pathfinder.visualizer.javafx.MultiAlgoDemo'
 }
 
 tasks.named('test') {
