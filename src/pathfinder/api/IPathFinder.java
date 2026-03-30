@@ -21,4 +21,7 @@ public interface IPathFinder<P extends Point> {
 
   /** Computes the full path from start to goal, update the internal path data structure. */
   void computePath();
+
+  /** Returns the computed path container. */
+  PathContainer<P> getPath();
 }

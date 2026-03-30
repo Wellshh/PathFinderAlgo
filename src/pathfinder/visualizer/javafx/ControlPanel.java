@@ -1,14 +1,19 @@
 package pathfinder.visualizer.javafx;
 
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.util.StringConverter;
 import pathfinder.engine.SimulationState;
+import pathfinder.factory.AlgorithmType;
 
 /**
  * Reusable JavaFX control panel that bidirectionally binds to a {@link SimulationConfigModel}. All
@@ -28,11 +33,23 @@ public class ControlPanel extends VBox {
   private final Label speedLabel = new Label("Speed: 1.0x");
   private final Label tickRateLabel = new Label("Tick Rate: 10.0/s");
 
+  private final ComboBox<AlgorithmType> algoACombo = new ComboBox<>();
+  private final ComboBox<AlgorithmType> algoBCombo = new ComboBox<>();
+  private final CheckBox battleModeCb = new CheckBox("Battle Mode");
+  private final Button battleBtn = new Button("Start Battle");
+
+  private Runnable onBattleRequested;
+
   public ControlPanel(SimulationConfigModel config) {
     this.config = config;
     buildLayout();
     bindProperties();
     setupActions();
+  }
+
+  /** Register a callback invoked when the user clicks "Start Battle". */
+  public void setOnBattleRequested(Runnable handler) {
+    this.onBattleRequested = handler;
   }
 
   private void buildLayout() {
@@ -59,7 +76,35 @@ public class ControlPanel extends VBox {
     HBox toggleRow = new HBox(12, showOpenCb, showClosedCb);
     toggleRow.setAlignment(Pos.CENTER_LEFT);
 
-    getChildren().addAll(transportRow, speedRow, tickRateRow, toggleRow);
+    // Algorithm selection & battle controls
+    StringConverter<AlgorithmType> converter =
+        new StringConverter<>() {
+          @Override
+          public String toString(AlgorithmType t) {
+            return t == null ? "" : t.getDisplayName();
+          }
+
+          @Override
+          public AlgorithmType fromString(String s) {
+            return null;
+          }
+        };
+
+    algoACombo.setItems(FXCollections.observableArrayList(AlgorithmType.values()));
+    algoACombo.setConverter(converter);
+    algoBCombo.setItems(FXCollections.observableArrayList(AlgorithmType.values()));
+    algoBCombo.setConverter(converter);
+
+    HBox algoRow = new HBox(8, new Label("Algo A:"), algoACombo, new Label("Algo B:"), algoBCombo);
+    algoRow.setAlignment(Pos.CENTER_LEFT);
+
+    battleBtn.setDisable(true);
+    HBox battleRow = new HBox(12, battleModeCb, battleBtn);
+    battleRow.setAlignment(Pos.CENTER_LEFT);
+
+    getChildren()
+        .addAll(
+            transportRow, speedRow, tickRateRow, toggleRow, new Separator(), algoRow, battleRow);
   }
 
   private void bindProperties() {
@@ -67,6 +112,10 @@ public class ControlPanel extends VBox {
     tickRateSlider.valueProperty().bindBidirectional(config.logicTicksPerSecondProperty());
     showOpenCb.selectedProperty().bindBidirectional(config.showOpenListProperty());
     showClosedCb.selectedProperty().bindBidirectional(config.showClosedListProperty());
+
+    algoACombo.valueProperty().bindBidirectional(config.selectedAlgorithmAProperty());
+    algoBCombo.valueProperty().bindBidirectional(config.selectedAlgorithmBProperty());
+    battleModeCb.selectedProperty().bindBidirectional(config.battleModeEnabledProperty());
 
     config
         .playbackSpeedProperty()
@@ -83,6 +132,10 @@ public class ControlPanel extends VBox {
     config
         .simulationStateProperty()
         .addListener((obs, oldVal, newVal) -> updateButtonLabels(newVal));
+
+    config
+        .battleModeEnabledProperty()
+        .addListener((obs, oldVal, newVal) -> battleBtn.setDisable(!newVal));
   }
 
   private void setupActions() {
@@ -98,6 +151,13 @@ public class ControlPanel extends VBox {
 
     stopBtn.setOnAction(e -> config.requestStop());
     resetBtn.setOnAction(e -> config.requestReset());
+
+    battleBtn.setOnAction(
+        e -> {
+          if (onBattleRequested != null) {
+            onBattleRequested.run();
+          }
+        });
   }
 
   private void updateButtonLabels(SimulationState state) {

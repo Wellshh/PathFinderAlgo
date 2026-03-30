@@ -18,6 +18,8 @@ public class AlgorithmSlot<P extends Point> {
   private final AlgorithmStateLayer stateLayer;
   private final RobotEntity robot;
 
+  private AlgorithmMetrics lastMetrics;
+
   public AlgorithmSlot(
       String name, IPathFinder<P> pathFinder, AlgorithmStateLayer stateLayer, RobotEntity robot) {
     this.name = name;
@@ -40,5 +42,14 @@ public class AlgorithmSlot<P extends Point> {
 
   public RobotEntity getRobot() {
     return robot;
+  }
+
+  /** Returns the most recent performance metrics, or {@code null} if not yet measured. */
+  public AlgorithmMetrics getLastMetrics() {
+    return lastMetrics;
+  }
+
+  public void setLastMetrics(AlgorithmMetrics metrics) {
+    this.lastMetrics = metrics;
   }
 }

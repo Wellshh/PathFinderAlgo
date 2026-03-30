@@ -1,6 +1,5 @@
 package pathfinder.visualizer.javafx;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -9,12 +8,16 @@ import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import pathfinder.algorithm.dstarlite.DStarLitePathFinder;
+import pathfinder.api.IPathFinder;
+import pathfinder.engine.AlgorithmMetrics;
 import pathfinder.engine.AlgorithmSlot;
 import pathfinder.engine.AllParallelScheduler;
+import pathfinder.engine.BattleEngine;
 import pathfinder.engine.SimulationController;
-import pathfinder.model.EdgeUpdate;
+import pathfinder.factory.AlgorithmFactory;
+import pathfinder.factory.AlgorithmType;
 import pathfinder.model.Point2D;
 import pathfinder.testenv.environment.Grid2DEnvironment;
 import pathfinder.visualizer.CellState;
@@ -24,8 +27,9 @@ import pathfinder.visualizer.model.AlgorithmStateLayer;
 import pathfinder.visualizer.model.RobotEntity;
 
 /**
- * Demonstrates two D* Lite instances racing on the same grid with different start positions. Each
- * algorithm has its own overlay layer and robot entity, composited via alpha blending.
+ * Runtime-configurable multi-algorithm battle demo. Algorithm selection, battle execution, and
+ * performance comparison are all driven through {@link SimulationConfigModel} and {@link
+ * BattleEngine}, with no hard-coded algorithm dependencies.
  */
 public class MultiAlgoDemo extends Application {
 
@@ -39,17 +43,15 @@ public class MultiAlgoDemo extends Application {
   private final Grid2DEnvironment env = new Grid2DEnvironment(GRID_W, GRID_H);
   private final GridViewModel viewModel = new GridViewModel(GRID_W, GRID_H);
 
-  private final DStarLitePathFinder<Point2D> pfA = new DStarLitePathFinder<>();
-  private final DStarLitePathFinder<Point2D> pfB = new DStarLitePathFinder<>();
-
-  private final Point2D startA = new Point2D(2, 5);
-  private final Point2D startB = new Point2D(2, GRID_H - 6);
+  private final Point2D start = new Point2D(2, GRID_H / 2);
   private final Point2D goal = new Point2D(GRID_W - 3, GRID_H / 2);
 
   private AlgorithmSlot<Point2D> slotA;
   private AlgorithmSlot<Point2D> slotB;
 
   private final SimulationController simController = new SimulationController();
+  private SimulationConfigModel configModel;
+  private final BattleEngine<Point2D> battleEngine = new BattleEngine<>();
   private final Label statusBar = new Label("Multi-Algo Battle — click to place obstacles");
 
   private final ExecutorService algorithmExecutor =
@@ -62,9 +64,12 @@ public class MultiAlgoDemo extends Application {
 
   @Override
   public void start(Stage primaryStage) {
-    initAlgorithms();
-    initLayers();
-    syncModelFromEnv();
+    configModel = new SimulationConfigModel(simController);
+
+    placeSampleWall();
+    rebuildSlots();
+    syncObstaclesToViewModel();
+    runBattle();
 
     JavaFXGridVisualizer visualizer = new JavaFXGridVisualizer();
     visualizer.setCellSize(CELL_PX);
@@ -73,12 +78,26 @@ public class MultiAlgoDemo extends Application {
 
     simController.setScheduler(new AllParallelScheduler());
     simController.setLogicTicksPerSecond(5.0);
-
     simController.addRenderTickListener(dt -> visualizer.renderFrame(dt));
+
+    ControlPanel controlPanel = new ControlPanel(configModel);
+    controlPanel.setOnBattleRequested(() -> algorithmExecutor.submit(this::runBattle));
+
+    StatisticsPanel statsPanel = new StatisticsPanel(configModel);
+
+    VBox rightPane = new VBox(8, controlPanel, statsPanel);
 
     BorderPane root = new BorderPane();
     root.setCenter(visualizer.asPane());
+    root.setRight(rightPane);
     root.setBottom(statusBar);
+
+    configModel
+        .selectedAlgorithmAProperty()
+        .addListener((obs, oldVal, newVal) -> onAlgorithmChanged());
+    configModel
+        .selectedAlgorithmBProperty()
+        .addListener((obs, oldVal, newVal) -> onAlgorithmChanged());
 
     Scene scene = new Scene(root);
     primaryStage.setTitle("Multi-Algorithm Battle Demo");
@@ -94,28 +113,37 @@ public class MultiAlgoDemo extends Application {
     algorithmExecutor.shutdownNow();
   }
 
-  // -------------------- Initialization --------------------
+  // -------------------- Slot management --------------------
 
-  private void initAlgorithms() {
-    placeSampleWall();
-    pfA.initialize(env, startA, goal);
-    pfA.computePath();
-    pfB.initialize(env, startB, goal);
-    pfB.computePath();
-  }
+  private void rebuildSlots() {
+    AlgorithmType typeA = configModel.getSelectedAlgorithmA();
+    AlgorithmType typeB = configModel.getSelectedAlgorithmB();
 
-  private void initLayers() {
-    AlgorithmStateLayer layerA = viewModel.addAlgorithmLayer("D*Lite-A", COLOR_ALGO_A);
+    viewModel.getAlgoLayers().clear();
+    viewModel.getRobots().clear();
+
+    IPathFinder<Point2D> pfA = AlgorithmFactory.createPathFinder(typeA);
+    AlgorithmStateLayer layerA = viewModel.addAlgorithmLayer(typeA.getDisplayName(), COLOR_ALGO_A);
     layerA.setAlpha(0.6);
-    RobotEntity robotA = viewModel.addRobot("robot-A", COLOR_ALGO_A, startA.x, startA.y);
+    RobotEntity robotA = viewModel.addRobot("robot-A", COLOR_ALGO_A, start.x, start.y);
+    slotA = new AlgorithmSlot<>(typeA.getDisplayName(), pfA, layerA, robotA);
 
-    AlgorithmStateLayer layerB = viewModel.addAlgorithmLayer("D*Lite-B", COLOR_ALGO_B);
+    IPathFinder<Point2D> pfB = AlgorithmFactory.createPathFinder(typeB);
+    AlgorithmStateLayer layerB = viewModel.addAlgorithmLayer(typeB.getDisplayName(), COLOR_ALGO_B);
     layerB.setAlpha(0.6);
-    RobotEntity robotB = viewModel.addRobot("robot-B", COLOR_ALGO_B, startB.x, startB.y);
-
-    slotA = new AlgorithmSlot<>("D*Lite-A", pfA, layerA, robotA);
-    slotB = new AlgorithmSlot<>("D*Lite-B", pfB, layerB, robotB);
+    RobotEntity robotB = viewModel.addRobot("robot-B", COLOR_ALGO_B, start.x, start.y);
+    slotB = new AlgorithmSlot<>(typeB.getDisplayName(), pfB, layerB, robotB);
   }
+
+  private void onAlgorithmChanged() {
+    algorithmExecutor.submit(
+        () -> {
+          rebuildSlots();
+          runBattle();
+        });
+  }
+
+  // -------------------- Environment setup --------------------
 
   private void placeSampleWall() {
     int wallX = GRID_W / 2;
@@ -126,20 +154,52 @@ public class MultiAlgoDemo extends Application {
   }
 
   @SuppressWarnings("deprecation")
-  private void syncModelFromEnv() {
+  private void syncObstaclesToViewModel() {
     for (int y = 0; y < GRID_H; y++) {
       for (int x = 0; x < GRID_W; x++) {
         if (env.isObstacle(x, y)) {
           viewModel.setCellState(x, y, CellState.OBSTACLE);
+        } else {
+          viewModel.setCellState(x, y, CellState.FREE);
         }
       }
     }
-    viewModel.setCellState(startA.x, startA.y, CellState.START);
-    viewModel.setCellState(startB.x, startB.y, CellState.START);
+    viewModel.setCellState(start.x, start.y, CellState.START);
     viewModel.setCellState(goal.x, goal.y, CellState.GOAL);
+  }
 
-    publishPath(slotA, pfA);
-    publishPath(slotB, pfB);
+  // -------------------- Battle execution --------------------
+
+  private void runBattle() {
+    Platform.runLater(() -> statusBar.setText("Running battle..."));
+
+    List<AlgorithmMetrics> results =
+        battleEngine.runBattle(env, start, goal, List.of(slotA, slotB));
+
+    publishPath(slotA);
+    publishPath(slotB);
+
+    AlgorithmMetrics mA = results.get(0);
+    AlgorithmMetrics mB = results.get(1);
+
+    Platform.runLater(
+        () -> {
+          configModel.setMetricsA(mA);
+          configModel.setMetricsB(mB);
+          statusBar.setText(
+              String.format(
+                  "%s: %.3f ms, %d nodes | %s: %.3f ms, %d nodes",
+                  mA.algorithmName(),
+                  mA.computeTimeMs(),
+                  mA.pathLength(),
+                  mB.algorithmName(),
+                  mB.computeTimeMs(),
+                  mB.pathLength()));
+        });
+  }
+
+  private void publishPath(AlgorithmSlot<Point2D> slot) {
+    slot.getStateLayer().updatePath(slot.getPathFinder().getPath().toList());
   }
 
   // -------------------- Event wiring --------------------
@@ -159,71 +219,21 @@ public class MultiAlgoDemo extends Application {
 
       @Override
       public void onReplanRequested() {
-        algorithmExecutor.submit(() -> replanBoth());
+        algorithmExecutor.submit(() -> runBattle());
       }
     };
   }
 
-  // -------------------- Algorithm work --------------------
-
   private void handleObstacleToggle(int x, int y, boolean isNowObstacle) {
-    Platform.runLater(() -> statusBar.setText("Replanning both algorithms..."));
-
-    double newCellCost = isNowObstacle ? Double.POSITIVE_INFINITY : 1.0;
-    Point2D target = new Point2D(x, y);
-
-    List<EdgeUpdate<Point2D>> updates = new ArrayList<>();
-    for (Point2D neighbor : env.getNeighbors(target)) {
-      updates.add(new EdgeUpdate<>(neighbor, target, newCellCost));
-    }
-
     if (isNowObstacle) {
       env.setObstacle(x, y);
     } else {
       env.removeObstacle(x, y);
     }
 
-    if (!isNowObstacle) {
-      for (Point2D neighbor : env.getNeighbors(target)) {
-        updates.add(new EdgeUpdate<>(target, neighbor, env.getTraversalCost(target, neighbor)));
-      }
-    }
-
-    replanOne(pfA, startA, updates);
-    replanOne(pfB, startB, updates);
-
-    Platform.runLater(
-        () -> {
-          publishPath(slotA, pfA);
-          publishPath(slotB, pfB);
-          statusBar.setText(
-              String.format(
-                  "A: %d nodes | B: %d nodes", pfA.getPath().size(), pfB.getPath().size()));
-        });
-  }
-
-  private void replanOne(
-      DStarLitePathFinder<Point2D> pf, Point2D start, List<EdgeUpdate<Point2D>> updates) {
-    pf.setStart(start);
-    pf.updateAllEdgeCosts(updates);
-    pf.computePath();
-  }
-
-  private void replanBoth() {
-    pfA.setStart(startA);
-    pfA.computePath();
-    pfB.setStart(startB);
-    pfB.computePath();
-    Platform.runLater(
-        () -> {
-          publishPath(slotA, pfA);
-          publishPath(slotB, pfB);
-          statusBar.setText("Replanned both");
-        });
-  }
-
-  private void publishPath(AlgorithmSlot<Point2D> slot, DStarLitePathFinder<Point2D> pf) {
-    slot.getStateLayer().updatePath(pf.getPath().toList());
+    rebuildSlots();
+    syncObstaclesToViewModel();
+    runBattle();
   }
 
   // -------------------- Entry point --------------------

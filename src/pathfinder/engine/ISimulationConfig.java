@@ -54,4 +54,12 @@ public interface ISimulationConfig {
   void setShowClosedList(boolean show);
 
   void addShowClosedListListener(Consumer<Boolean> listener);
+
+  // -------------------- Battle mode --------------------
+
+  boolean isBattleModeEnabled();
+
+  void setBattleModeEnabled(boolean enabled);
+
+  void addBattleModeListener(Consumer<Boolean> listener);
 }

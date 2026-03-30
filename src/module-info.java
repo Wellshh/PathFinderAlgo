@@ -14,6 +14,8 @@ module PathFinderAlgo {
   exports pathfinder.testenv.environment;
   exports pathfinder.testenv.sensor;
   exports pathfinder.testenv.visualizer;
+  exports pathfinder.factory;
+  exports pathfinder.algorithm.astar;
   exports pathfinder.algorithm.dstarlite;
 
   opens pathfinder.visualizer.javafx to

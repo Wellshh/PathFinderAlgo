@@ -6,7 +6,7 @@
   - [ ] Octile in high dimension, may need override in lower dimension.
 #### Heuristic
 - [ ] A*
-  - [ ] Implement Binary Heap
+  - [x] Implement Binary Heap
   - [ ] 
 - [ ] Theta*
 - [ ] LPS*

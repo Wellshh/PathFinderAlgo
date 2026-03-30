@@ -7,9 +7,11 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import pathfinder.engine.AlgorithmMetrics;
 import pathfinder.engine.ISimulationConfig;
 import pathfinder.engine.SimulationController;
 import pathfinder.engine.SimulationState;
+import pathfinder.factory.AlgorithmType;
 
 /**
  * JavaFX-backed implementation of {@link ISimulationConfig}. All properties are JavaFX observable
@@ -27,6 +29,15 @@ public class SimulationConfigModel implements ISimulationConfig {
       new SimpleObjectProperty<>(SimulationState.IDLE);
   private final BooleanProperty showOpenList = new SimpleBooleanProperty(true);
   private final BooleanProperty showClosedList = new SimpleBooleanProperty(true);
+
+  // Battle mode properties (UI-specific, not part of ISimulationConfig)
+  private final ObjectProperty<AlgorithmType> selectedAlgorithmA =
+      new SimpleObjectProperty<>(AlgorithmType.ASTAR);
+  private final ObjectProperty<AlgorithmType> selectedAlgorithmB =
+      new SimpleObjectProperty<>(AlgorithmType.DSTAR_LITE);
+  private final BooleanProperty battleModeEnabled = new SimpleBooleanProperty(false);
+  private final ObjectProperty<AlgorithmMetrics> metricsA = new SimpleObjectProperty<>();
+  private final ObjectProperty<AlgorithmMetrics> metricsB = new SimpleObjectProperty<>();
 
   public SimulationConfigModel(SimulationController controller) {
     this.controller = controller;
@@ -59,6 +70,26 @@ public class SimulationConfigModel implements ISimulationConfig {
 
   public BooleanProperty showClosedListProperty() {
     return showClosedList;
+  }
+
+  public ObjectProperty<AlgorithmType> selectedAlgorithmAProperty() {
+    return selectedAlgorithmA;
+  }
+
+  public ObjectProperty<AlgorithmType> selectedAlgorithmBProperty() {
+    return selectedAlgorithmB;
+  }
+
+  public BooleanProperty battleModeEnabledProperty() {
+    return battleModeEnabled;
+  }
+
+  public ObjectProperty<AlgorithmMetrics> metricsAProperty() {
+    return metricsA;
+  }
+
+  public ObjectProperty<AlgorithmMetrics> metricsBProperty() {
+    return metricsB;
   }
 
   // -------------------- ISimulationConfig implementation --------------------
@@ -156,5 +187,56 @@ public class SimulationConfigModel implements ISimulationConfig {
   @Override
   public void addShowClosedListListener(Consumer<Boolean> listener) {
     showClosedList.addListener((obs, oldVal, newVal) -> listener.accept(newVal));
+  }
+
+  // -------------------- Battle mode (ISimulationConfig) --------------------
+
+  @Override
+  public boolean isBattleModeEnabled() {
+    return battleModeEnabled.get();
+  }
+
+  @Override
+  public void setBattleModeEnabled(boolean enabled) {
+    battleModeEnabled.set(enabled);
+  }
+
+  @Override
+  public void addBattleModeListener(Consumer<Boolean> listener) {
+    battleModeEnabled.addListener((obs, oldVal, newVal) -> listener.accept(newVal));
+  }
+
+  // -------------------- Algorithm selection (UI-specific) --------------------
+
+  public AlgorithmType getSelectedAlgorithmA() {
+    return selectedAlgorithmA.get();
+  }
+
+  public void setSelectedAlgorithmA(AlgorithmType type) {
+    selectedAlgorithmA.set(type);
+  }
+
+  public AlgorithmType getSelectedAlgorithmB() {
+    return selectedAlgorithmB.get();
+  }
+
+  public void setSelectedAlgorithmB(AlgorithmType type) {
+    selectedAlgorithmB.set(type);
+  }
+
+  public AlgorithmMetrics getMetricsA() {
+    return metricsA.get();
+  }
+
+  public void setMetricsA(AlgorithmMetrics metrics) {
+    metricsA.set(metrics);
+  }
+
+  public AlgorithmMetrics getMetricsB() {
+    return metricsB.get();
+  }
+
+  public void setMetricsB(AlgorithmMetrics metrics) {
+    metricsB.set(metrics);
   }
 }

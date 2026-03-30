@@ -243,7 +243,7 @@ public abstract class AbstractGridVisualizer implements IVisualizer {
       case NONE -> 0x00000000;
       case OPEN -> COLOR_OPEN;
       case CLOSED -> COLOR_CLOSED;
-      case PATH -> COLOR_PATH;
+      case PATH -> layer.getColorArgb();
     };
   }
 
