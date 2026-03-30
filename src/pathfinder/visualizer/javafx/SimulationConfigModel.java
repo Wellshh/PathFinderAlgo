@@ -125,8 +125,7 @@ public class SimulationConfigModel implements ISimulationConfig {
 
   @Override
   public void addTickRateListener(Consumer<Double> listener) {
-    logicTicksPerSecond.addListener(
-        (obs, oldVal, newVal) -> listener.accept(newVal.doubleValue()));
+    logicTicksPerSecond.addListener((obs, oldVal, newVal) -> listener.accept(newVal.doubleValue()));
   }
 
   @Override

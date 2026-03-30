@@ -10,9 +10,6 @@ import pathfinder.model.Point;
  */
 public interface IPathFinder<P extends Point> {
 
-  /** Path container to store the path */
-  PathContainer<P> getPath();
-
   /** Initializes the planner with the environment topology, start, and goal. */
   void initialize(Environment<P> env, P start, P goal);
 

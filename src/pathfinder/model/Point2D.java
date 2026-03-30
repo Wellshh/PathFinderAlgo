@@ -2,7 +2,7 @@ package pathfinder.model;
 
 import java.util.Objects;
 
-/** Concrete 2D integer coordinate, replacing the former Coordinate class. */
+/** Concrete 2D integer coordinate */
 public class Point2D extends Point {
   public final int x;
   public final int y;
@@ -10,6 +10,26 @@ public class Point2D extends Point {
   public Point2D(int x, int y) {
     this.x = x;
     this.y = y;
+  }
+
+  @Override
+  public int getDim() {
+    return 2;
+  }
+
+  @Override
+  public double getDimDiff(int dimIndex, Point other) throws IllegalArgumentException {
+    if (dimIndex < 0 || dimIndex >= getDim()) {
+      throw new IllegalArgumentException("Invalid dimension index: " + dimIndex);
+    }
+    Point2D o = (Point2D) other;
+    if (dimIndex == 0) {
+      return x - o.x;
+    } else if (dimIndex == 1) {
+      return y - o.y;
+    } else {
+      return 0;
+    }
   }
 
   @Override

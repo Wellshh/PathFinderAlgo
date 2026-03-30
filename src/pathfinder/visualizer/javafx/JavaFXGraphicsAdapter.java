@@ -7,8 +7,8 @@ import javafx.scene.text.Font;
 import pathfinder.visualizer.adapter.IGraphicsAdapter;
 
 /**
- * JavaFX implementation of {@link IGraphicsAdapter}. Wraps a {@link Canvas}'s
- * {@link GraphicsContext} and translates packed-ARGB colors into JavaFX {@link Color} instances.
+ * JavaFX implementation of {@link IGraphicsAdapter}. Wraps a {@link Canvas}'s {@link
+ * GraphicsContext} and translates packed-ARGB colors into JavaFX {@link Color} instances.
  */
 public class JavaFXGraphicsAdapter implements IGraphicsAdapter {
 

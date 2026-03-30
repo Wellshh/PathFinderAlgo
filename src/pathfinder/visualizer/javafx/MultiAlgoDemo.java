@@ -192,20 +192,18 @@ public class MultiAlgoDemo extends Application {
     replanOne(pfA, startA, updates);
     replanOne(pfB, startB, updates);
 
-    Platform.runLater(() -> {
-      publishPath(slotA, pfA);
-      publishPath(slotB, pfB);
-      statusBar.setText(
-          String.format(
-              "A: %d nodes | B: %d nodes",
-              pfA.getPath().size(), pfB.getPath().size()));
-    });
+    Platform.runLater(
+        () -> {
+          publishPath(slotA, pfA);
+          publishPath(slotB, pfB);
+          statusBar.setText(
+              String.format(
+                  "A: %d nodes | B: %d nodes", pfA.getPath().size(), pfB.getPath().size()));
+        });
   }
 
   private void replanOne(
-      DStarLitePathFinder<Point2D> pf,
-      Point2D start,
-      List<EdgeUpdate<Point2D>> updates) {
+      DStarLitePathFinder<Point2D> pf, Point2D start, List<EdgeUpdate<Point2D>> updates) {
     pf.setStart(start);
     pf.updateAllEdgeCosts(updates);
     pf.computePath();
@@ -216,11 +214,12 @@ public class MultiAlgoDemo extends Application {
     pfA.computePath();
     pfB.setStart(startB);
     pfB.computePath();
-    Platform.runLater(() -> {
-      publishPath(slotA, pfA);
-      publishPath(slotB, pfB);
-      statusBar.setText("Replanned both");
-    });
+    Platform.runLater(
+        () -> {
+          publishPath(slotA, pfA);
+          publishPath(slotB, pfB);
+          statusBar.setText("Replanned both");
+        });
   }
 
   private void publishPath(AlgorithmSlot<Point2D> slot, DStarLitePathFinder<Point2D> pf) {

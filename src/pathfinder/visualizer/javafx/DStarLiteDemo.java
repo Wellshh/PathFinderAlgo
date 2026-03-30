@@ -19,15 +19,11 @@ import pathfinder.visualizer.GridInteractionListener;
 import pathfinder.visualizer.GridViewModel;
 
 /**
- * Standalone JavaFX demo that wires {@link DStarLitePathFinder} to the
- * {@link JavaFXGridVisualizer}
+ * Standalone JavaFX demo that wires {@link DStarLitePathFinder} to the {@link JavaFXGridVisualizer}
  * through the observer event system.
  *
- * <p>
- * Usage: click or drag on the canvas to toggle obstacles. Each toggle triggers
- * an incremental
- * replan on a background thread; the updated path appears on the canvas without
- * blocking the UI.
+ * <p>Usage: click or drag on the canvas to toggle obstacles. Each toggle triggers an incremental
+ * replan on a background thread; the updated path appears on the canvas without blocking the UI.
  */
 public class DStarLiteDemo extends Application {
 
@@ -42,12 +38,13 @@ public class DStarLiteDemo extends Application {
   private final Point2D start = new Point2D(2, GRID_H / 2);
   private final Point2D goal = new Point2D(GRID_W - 3, GRID_H / 2);
 
-  private final ExecutorService algorithmExecutor = Executors.newSingleThreadExecutor(
-      r -> {
-        Thread t = new Thread(r, "algo-worker");
-        t.setDaemon(true);
-        return t;
-      });
+  private final ExecutorService algorithmExecutor =
+      Executors.newSingleThreadExecutor(
+          r -> {
+            Thread t = new Thread(r, "algo-worker");
+            t.setDaemon(true);
+            return t;
+          });
 
   private final Label statusBar = new Label("Ready — click to place obstacles");
 
@@ -90,8 +87,7 @@ public class DStarLiteDemo extends Application {
   private void placeSampleWall() {
     int wallX = GRID_W / 2;
     for (int y = 2; y < GRID_H - 2; y++) {
-      if (y == GRID_H / 2)
-        continue; // leave a gap
+      if (y == GRID_H / 2) continue; // leave a gap
       env.setObstacle(wallX, y);
     }
   }

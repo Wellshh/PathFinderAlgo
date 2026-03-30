@@ -17,6 +17,7 @@ import pathfinder.visualizer.model.RobotEntity;
  * provide platform-specific adapters and drive the render loop.
  *
  * <h3>Render pipeline (executed per frame):</h3>
+ *
  * <ol>
  *   <li>Update robot interpolation positions
  *   <li>Consume dirty sets from base map layer
@@ -134,9 +135,7 @@ public abstract class AbstractGridVisualizer implements IVisualizer {
     }
   }
 
-  /**
-   * New multi-layer rendering path: base layer + algorithm overlays + robot entities.
-   */
+  /** New multi-layer rendering path: base layer + algorithm overlays + robot entities. */
   private void renderLayered(IGraphicsAdapter gfx, double deltaTimeSeconds) {
     BaseMapLayer base = model.getBaseLayer();
     int w = model.getWidth();

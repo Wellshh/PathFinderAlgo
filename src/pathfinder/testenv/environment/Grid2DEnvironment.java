@@ -65,6 +65,11 @@ public class Grid2DEnvironment implements Environment<Point2D> {
   // -------- Environment<Point2D> contract --------
 
   @Override
+  public int getSpaceCost() {
+    return (width + 1) * (height + 1);
+  }
+
+  @Override
   public double getTraversalCost(Point2D from, Point2D to) {
     if (!inBounds(to.x, to.y) || isObstacle(to.x, to.y)) {
       return Double.POSITIVE_INFINITY;

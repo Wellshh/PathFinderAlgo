@@ -39,7 +39,9 @@ public final class CellColors {
     return LOOKUP[state.ordinal()];
   }
 
-  /** O(1) packed-ARGB lookup for use with {@link pathfinder.visualizer.adapter.IGraphicsAdapter}. */
+  /**
+   * O(1) packed-ARGB lookup for use with {@link pathfinder.visualizer.adapter.IGraphicsAdapter}.
+   */
   public static int argbForState(CellState state) {
     return ARGB_LOOKUP[state.ordinal()];
   }

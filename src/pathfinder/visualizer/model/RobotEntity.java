@@ -67,7 +67,9 @@ public class RobotEntity {
     this.speed = cellsPerSecond;
   }
 
-  /** @return true if the entity has reached its target. */
+  /**
+   * @return true if the entity has reached its target.
+   */
   public boolean isIdle() {
     return progress >= 1.0;
   }

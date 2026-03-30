@@ -19,10 +19,7 @@ public class AlgorithmSlot<P extends Point> {
   private final RobotEntity robot;
 
   public AlgorithmSlot(
-      String name,
-      IPathFinder<P> pathFinder,
-      AlgorithmStateLayer stateLayer,
-      RobotEntity robot) {
+      String name, IPathFinder<P> pathFinder, AlgorithmStateLayer stateLayer, RobotEntity robot) {
     this.name = name;
     this.pathFinder = pathFinder;
     this.stateLayer = stateLayer;

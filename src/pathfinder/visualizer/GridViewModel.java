@@ -14,9 +14,9 @@ import pathfinder.visualizer.model.RobotEntity;
  * Observable grid model backed by a multi-layer architecture. Serves as the single source of truth
  * for all rendering.
  *
- * <p>Internally delegates to {@link BaseMapLayer} (obstacles, start, goal) and zero or more
- * {@link AlgorithmStateLayer}s (one per algorithm). A backward-compatible facade using legacy
- * {@link CellState} is retained so existing callers compile unchanged.
+ * <p>Internally delegates to {@link BaseMapLayer} (obstacles, start, goal) and zero or more {@link
+ * AlgorithmStateLayer}s (one per algorithm). A backward-compatible facade using legacy {@link
+ * CellState} is retained so existing callers compile unchanged.
  *
  * <p>Thread-safety: mutation methods are {@code synchronized}.
  */

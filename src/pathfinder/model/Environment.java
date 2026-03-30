@@ -8,6 +8,9 @@ import java.util.List;
  * @param <P> the spatial coordinate type
  */
 public interface Environment<P extends Point> {
+  /** An estimation of space cost of environment */
+  int getSpaceCost();
+
   /** Get traversal cost for a directed edge */
   double getTraversalCost(P from, P to);
 

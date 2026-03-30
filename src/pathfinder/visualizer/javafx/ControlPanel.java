@@ -68,27 +68,33 @@ public class ControlPanel extends VBox {
     showOpenCb.selectedProperty().bindBidirectional(config.showOpenListProperty());
     showClosedCb.selectedProperty().bindBidirectional(config.showClosedListProperty());
 
-    config.playbackSpeedProperty().addListener(
-        (obs, oldVal, newVal) -> speedLabel.setText(
-            String.format("Speed: %.1fx", newVal.doubleValue())));
+    config
+        .playbackSpeedProperty()
+        .addListener(
+            (obs, oldVal, newVal) ->
+                speedLabel.setText(String.format("Speed: %.1fx", newVal.doubleValue())));
 
-    config.logicTicksPerSecondProperty().addListener(
-        (obs, oldVal, newVal) -> tickRateLabel.setText(
-            String.format("Tick Rate: %.0f/s", newVal.doubleValue())));
+    config
+        .logicTicksPerSecondProperty()
+        .addListener(
+            (obs, oldVal, newVal) ->
+                tickRateLabel.setText(String.format("Tick Rate: %.0f/s", newVal.doubleValue())));
 
-    config.simulationStateProperty().addListener(
-        (obs, oldVal, newVal) -> updateButtonLabels(newVal));
+    config
+        .simulationStateProperty()
+        .addListener((obs, oldVal, newVal) -> updateButtonLabels(newVal));
   }
 
   private void setupActions() {
-    startPauseBtn.setOnAction(e -> {
-      SimulationState state = config.getSimulationState();
-      if (state == SimulationState.IDLE || state == SimulationState.PAUSED) {
-        config.requestStart();
-      } else if (state == SimulationState.RUNNING) {
-        config.requestPause();
-      }
-    });
+    startPauseBtn.setOnAction(
+        e -> {
+          SimulationState state = config.getSimulationState();
+          if (state == SimulationState.IDLE || state == SimulationState.PAUSED) {
+            config.requestStart();
+          } else if (state == SimulationState.RUNNING) {
+            config.requestPause();
+          }
+        });
 
     stopBtn.setOnAction(e -> config.requestStop());
     resetBtn.setOnAction(e -> config.requestReset());
