@@ -3,6 +3,7 @@ package pathfinder.visualizer.javafx;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -16,10 +17,13 @@ import pathfinder.engine.AlgorithmSlot;
 import pathfinder.engine.AllParallelScheduler;
 import pathfinder.engine.BattleEngine;
 import pathfinder.engine.SimulationController;
+import pathfinder.engine.SimulationRunner;
 import pathfinder.factory.AlgorithmFactory;
 import pathfinder.factory.AlgorithmType;
+import pathfinder.model.EdgeUpdate;
 import pathfinder.model.Point2D;
 import pathfinder.testenv.environment.Grid2DEnvironment;
+import pathfinder.testenv.sensor.SimpleGridSensor;
 import pathfinder.visualizer.CellState;
 import pathfinder.visualizer.GridInteractionListener;
 import pathfinder.visualizer.GridViewModel;
@@ -27,20 +31,31 @@ import pathfinder.visualizer.model.AlgorithmStateLayer;
 import pathfinder.visualizer.model.RobotEntity;
 
 /**
- * Runtime-configurable multi-algorithm battle demo. Algorithm selection, battle execution, and
- * performance comparison are all driven through {@link SimulationConfigModel} and {@link
- * BattleEngine}, with no hard-coded algorithm dependencies.
+ * Runtime-configurable multi-algorithm battle and simulation demo. Supports two modes:
+ *
+ * <ul>
+ *   <li><b>Battle mode</b>: one-shot comparison of two algorithms on the full ground-truth map
+ *   <li><b>Simulation mode</b>: robots autonomously move, sense hidden obstacles via {@link
+ *       SimpleGridSensor}, and replan incrementally (Start/Pause/Stop controls)
+ * </ul>
+ *
+ * <p>Obstacle clicks during simulation modify only the ground truth; robots discover them through
+ * their sensor.
  */
 public class MultiAlgoDemo extends Application {
 
   private static final int GRID_W = 50;
   private static final int GRID_H = 35;
   private static final double CELL_PX = 18.0;
+  private static final int SENSE_RADIUS = 3;
 
   private static final int COLOR_ALGO_A = 0xFFE65100; // deep orange
   private static final int COLOR_ALGO_B = 0xFF1565C0; // blue
 
-  private final Grid2DEnvironment env = new Grid2DEnvironment(GRID_W, GRID_H);
+  private final Grid2DEnvironment groundTruth = new Grid2DEnvironment(GRID_W, GRID_H);
+  private Grid2DEnvironment knownMapA;
+  private Grid2DEnvironment knownMapB;
+
   private final GridViewModel viewModel = new GridViewModel(GRID_W, GRID_H);
 
   private final Point2D start = new Point2D(2, GRID_H / 2);
@@ -52,6 +67,9 @@ public class MultiAlgoDemo extends Application {
   private final SimulationController simController = new SimulationController();
   private SimulationConfigModel configModel;
   private final BattleEngine<Point2D> battleEngine = new BattleEngine<>();
+  private SimulationRunner<Point2D> simRunner;
+  private AnimationTimer tickPump;
+
   private final Label statusBar = new Label("Multi-Algo Battle — click to place obstacles");
 
   private final ExecutorService algorithmExecutor =
@@ -68,8 +86,7 @@ public class MultiAlgoDemo extends Application {
 
     placeSampleWall();
     rebuildSlots();
-    syncObstaclesToViewModel();
-    runBattle();
+    runInitialBattle();
 
     JavaFXGridVisualizer visualizer = new JavaFXGridVisualizer();
     visualizer.setCellSize(CELL_PX);
@@ -78,10 +95,14 @@ public class MultiAlgoDemo extends Application {
 
     simController.setScheduler(new AllParallelScheduler());
     simController.setLogicTicksPerSecond(5.0);
+
+    // The visualizer renders via simController's render tick, driven by our tick pump.
+    // Do NOT call visualizer.show() — we drive rendering ourselves.
     simController.addRenderTickListener(dt -> visualizer.renderFrame(dt));
+    createTickPump();
 
     ControlPanel controlPanel = new ControlPanel(configModel);
-    controlPanel.setOnBattleRequested(() -> algorithmExecutor.submit(this::runBattle));
+    controlPanel.setOnBattleRequested(() -> algorithmExecutor.submit(this::runInitialBattle));
 
     StatisticsPanel statsPanel = new StatisticsPanel(configModel);
 
@@ -105,15 +126,37 @@ public class MultiAlgoDemo extends Application {
     primaryStage.setResizable(false);
     primaryStage.show();
 
-    visualizer.show();
+    tickPump.start();
   }
 
   @Override
   public void stop() {
+    if (tickPump != null) tickPump.stop();
     algorithmExecutor.shutdownNow();
   }
 
-  // -------------------- Slot management --------------------
+  /**
+   * AnimationTimer that pumps {@link SimulationController#onRenderTick(double)} every frame.
+   * This is the single driver for both logic ticks (simulation steps) and render callbacks.
+   */
+  private void createTickPump() {
+    tickPump =
+        new AnimationTimer() {
+          private long lastNanos = 0;
+
+          @Override
+          public void handle(long nowNanos) {
+            double dt = 0.0;
+            if (lastNanos > 0) {
+              dt = (nowNanos - lastNanos) / 1_000_000_000.0;
+            }
+            lastNanos = nowNanos;
+            simController.onRenderTick(dt);
+          }
+        };
+  }
+
+  // -------------------- Slot & environment management --------------------
 
   private void rebuildSlots() {
     AlgorithmType typeA = configModel.getSelectedAlgorithmA();
@@ -121,25 +164,52 @@ public class MultiAlgoDemo extends Application {
 
     viewModel.getAlgoLayers().clear();
     viewModel.getRobots().clear();
+    simController.clearAlgorithmStepActions();
+
+    knownMapA = copyEnvironment(groundTruth);
+    knownMapB = copyEnvironment(groundTruth);
 
     IPathFinder<Point2D> pfA = AlgorithmFactory.createPathFinder(typeA);
-    AlgorithmStateLayer layerA = viewModel.addAlgorithmLayer(typeA.getDisplayName(), COLOR_ALGO_A);
+    AlgorithmStateLayer layerA =
+        viewModel.addAlgorithmLayer(typeA.getDisplayName(), COLOR_ALGO_A);
     layerA.setAlpha(0.6);
     RobotEntity robotA = viewModel.addRobot("robot-A", COLOR_ALGO_A, start.x, start.y);
     slotA = new AlgorithmSlot<>(typeA.getDisplayName(), pfA, layerA, robotA);
 
     IPathFinder<Point2D> pfB = AlgorithmFactory.createPathFinder(typeB);
-    AlgorithmStateLayer layerB = viewModel.addAlgorithmLayer(typeB.getDisplayName(), COLOR_ALGO_B);
+    AlgorithmStateLayer layerB =
+        viewModel.addAlgorithmLayer(typeB.getDisplayName(), COLOR_ALGO_B);
     layerB.setAlpha(0.6);
     RobotEntity robotB = viewModel.addRobot("robot-B", COLOR_ALGO_B, start.x, start.y);
     slotB = new AlgorithmSlot<>(typeB.getDisplayName(), pfB, layerB, robotB);
+
+    setupSimulationRunner();
+    syncViewModelFromGroundTruth();
+  }
+
+  private void setupSimulationRunner() {
+    simRunner = new SimulationRunner<>(goal);
+
+    SimpleGridSensor sensorA = new SimpleGridSensor(groundTruth, knownMapA, SENSE_RADIUS);
+    SimpleGridSensor sensorB = new SimpleGridSensor(groundTruth, knownMapB, SENSE_RADIUS);
+
+    simRunner.registerSlot(slotA, knownMapA, sensorA);
+    simRunner.registerSlot(slotB, knownMapB, sensorB);
+
+    simRunner.setOnMetricsUpdated(this::onSlotMetricsUpdated);
+    simRunner.setOnEnvironmentDiscovered(this::onObstaclesDiscovered);
+
+    simController.clearAlgorithmStepActions();
+    simController.addAlgorithmStepAction(() -> simRunner.stepSlot(slotA));
+    simController.addAlgorithmStepAction(() -> simRunner.stepSlot(slotB));
   }
 
   private void onAlgorithmChanged() {
     algorithmExecutor.submit(
         () -> {
+          simController.reset();
           rebuildSlots();
-          runBattle();
+          runInitialBattle();
         });
   }
 
@@ -149,15 +219,27 @@ public class MultiAlgoDemo extends Application {
     int wallX = GRID_W / 2;
     for (int y = 2; y < GRID_H - 2; y++) {
       if (y == GRID_H / 2) continue;
-      env.setObstacle(wallX, y);
+      groundTruth.setObstacle(wallX, y);
     }
   }
 
-  @SuppressWarnings("deprecation")
-  private void syncObstaclesToViewModel() {
+  private Grid2DEnvironment copyEnvironment(Grid2DEnvironment source) {
+    Grid2DEnvironment copy = new Grid2DEnvironment(GRID_W, GRID_H);
     for (int y = 0; y < GRID_H; y++) {
       for (int x = 0; x < GRID_W; x++) {
-        if (env.isObstacle(x, y)) {
+        if (source.isObstacle(x, y)) {
+          copy.setObstacle(x, y);
+        }
+      }
+    }
+    return copy;
+  }
+
+  @SuppressWarnings("deprecation")
+  private void syncViewModelFromGroundTruth() {
+    for (int y = 0; y < GRID_H; y++) {
+      for (int x = 0; x < GRID_W; x++) {
+        if (groundTruth.isObstacle(x, y)) {
           viewModel.setCellState(x, y, CellState.OBSTACLE);
         } else {
           viewModel.setCellState(x, y, CellState.FREE);
@@ -168,19 +250,19 @@ public class MultiAlgoDemo extends Application {
     viewModel.setCellState(goal.x, goal.y, CellState.GOAL);
   }
 
-  // -------------------- Battle execution --------------------
+  // -------------------- Battle execution (initial plan) --------------------
 
-  private void runBattle() {
-    Platform.runLater(() -> statusBar.setText("Running battle..."));
+  private void runInitialBattle() {
+    Platform.runLater(() -> statusBar.setText("Running initial plan..."));
 
-    List<AlgorithmMetrics> results =
-        battleEngine.runBattle(env, start, goal, List.of(slotA, slotB));
+    battleEngine.runBattle(knownMapA, start, goal, List.of(slotA));
+    battleEngine.runBattle(knownMapB, start, goal, List.of(slotB));
 
     publishPath(slotA);
     publishPath(slotB);
 
-    AlgorithmMetrics mA = results.get(0);
-    AlgorithmMetrics mB = results.get(1);
+    AlgorithmMetrics mA = slotA.getLastMetrics();
+    AlgorithmMetrics mB = slotB.getLastMetrics();
 
     Platform.runLater(
         () -> {
@@ -188,7 +270,7 @@ public class MultiAlgoDemo extends Application {
           configModel.setMetricsB(mB);
           statusBar.setText(
               String.format(
-                  "%s: %.3f ms, %d nodes | %s: %.3f ms, %d nodes",
+                  "%s: %.3f ms, %d nodes | %s: %.3f ms, %d nodes — Press Start to simulate",
                   mA.algorithmName(),
                   mA.computeTimeMs(),
                   mA.pathLength(),
@@ -202,13 +284,52 @@ public class MultiAlgoDemo extends Application {
     slot.getStateLayer().updatePath(slot.getPathFinder().getPath().toList());
   }
 
+  // -------------------- Simulation callbacks --------------------
+
+  private void onSlotMetricsUpdated(AlgorithmSlot<Point2D> slot) {
+    AlgorithmMetrics m = slot.getLastMetrics();
+    if (m == null) return;
+    Platform.runLater(
+        () -> {
+          if (slot == slotA) {
+            configModel.setMetricsA(m);
+          } else if (slot == slotB) {
+            configModel.setMetricsB(m);
+          }
+          statusBar.setText(
+              String.format(
+                  "%s replan: %.3f ms | path: %d",
+                  m.algorithmName(), m.replanTimeMs(), m.pathLength()));
+        });
+  }
+
+  @SuppressWarnings("deprecation")
+  private void onObstaclesDiscovered(
+      AlgorithmSlot<Point2D> slot, List<EdgeUpdate<Point2D>> updates) {
+    Platform.runLater(
+        () -> {
+          for (EdgeUpdate<Point2D> u : updates) {
+            Point2D to = u.to;
+            if (to.x >= 0 && to.x < GRID_W && to.y >= 0 && to.y < GRID_H) {
+              if (u.newCost == Double.POSITIVE_INFINITY) {
+                viewModel.setCellState(to.x, to.y, CellState.OBSTACLE);
+              }
+            }
+          }
+        });
+  }
+
   // -------------------- Event wiring --------------------
 
   private GridInteractionListener createInteractionListener() {
     return new GridInteractionListener() {
       @Override
       public void onCellToggled(int x, int y, boolean isNowObstacle) {
-        algorithmExecutor.submit(() -> handleObstacleToggle(x, y, isNowObstacle));
+        if (isNowObstacle) {
+          groundTruth.setObstacle(x, y);
+        } else {
+          groundTruth.removeObstacle(x, y);
+        }
       }
 
       @Override
@@ -219,21 +340,9 @@ public class MultiAlgoDemo extends Application {
 
       @Override
       public void onReplanRequested() {
-        algorithmExecutor.submit(() -> runBattle());
+        algorithmExecutor.submit(() -> runInitialBattle());
       }
     };
-  }
-
-  private void handleObstacleToggle(int x, int y, boolean isNowObstacle) {
-    if (isNowObstacle) {
-      env.setObstacle(x, y);
-    } else {
-      env.removeObstacle(x, y);
-    }
-
-    rebuildSlots();
-    syncObstaclesToViewModel();
-    runBattle();
   }
 
   // -------------------- Entry point --------------------

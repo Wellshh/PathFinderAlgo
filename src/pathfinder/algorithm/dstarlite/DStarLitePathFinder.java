@@ -237,7 +237,7 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
       double newRHS = Double.POSITIVE_INFINITY;
       for (P succ : succs) {
         DStarLiteNode<P> succNode = getOrCreateNode(succ);
-        double candidate = env.getTraversalCost(succ, curPos) + succNode.g;
+        double candidate = env.getTraversalCost(curPos, succ) + succNode.g;
         newRHS = Math.min(candidate, newRHS);
       }
       canonical.rhs = newRHS;
@@ -399,16 +399,19 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
         path.clear();
         return path;
       }
-      double minG = Double.POSITIVE_INFINITY;
+      double bestCost = Double.POSITIVE_INFINITY;
       P next = null;
       for (P successor : env.getSuccessors(current)) {
         DStarLiteNode<P> successorNode = sparseMap.get(successor);
-        if (successorNode != null && successorNode.g < minG) {
-          minG = successorNode.g;
+        if (successorNode == null) continue;
+        // Follow rhs-consistent gradient: pick successor minimizing c(u,s)+g(s)
+        double cost = env.getTraversalCost(current, successor) + successorNode.g;
+        if (cost < bestCost) {
+          bestCost = cost;
           next = successor;
         }
       }
-      if (next == null || minG == Double.POSITIVE_INFINITY) {
+      if (next == null || bestCost >= Double.POSITIVE_INFINITY) {
         path.clear();
         return path;
       }

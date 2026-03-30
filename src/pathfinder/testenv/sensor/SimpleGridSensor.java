@@ -37,6 +37,9 @@ public class SimpleGridSensor implements IEnvironmentSensor<Point2D> {
     int cx = currentPosition.x;
     int cy = currentPosition.y;
 
+    // Phase 1: detect ALL cost differences against the UNMODIFIED knownMap.
+    // Modifying knownMap inside this loop would mask subsequent differences for
+    // the same target cell (setTraversalCost is cell-based, not edge-based).
     for (int dy = -senseRadius; dy <= senseRadius; dy++) {
       for (int dx = -senseRadius; dx <= senseRadius; dx++) {
         int nx = cx + dx;
@@ -47,20 +50,23 @@ public class SimpleGridSensor implements IEnvironmentSensor<Point2D> {
 
         Point2D neighbor = new Point2D(nx, ny);
 
-        // For every neighbor of this scanned cell, compare edge costs
         List<Point2D> preds = groundTruth.getPredecessors(neighbor);
         for (Point2D pred : preds) {
           double realCost = groundTruth.getTraversalCost(pred, neighbor);
           double knownCost = knownMap.getTraversalCost(pred, neighbor);
 
           if (Double.compare(realCost, knownCost) != 0) {
-            // Sync the known map to match ground truth
-            knownMap.setTraversalCost(pred, neighbor, realCost);
             updates.add(new EdgeUpdate<>(pred, neighbor, realCost));
           }
         }
       }
     }
+
+    // Phase 2: apply all detected changes to the known map in one batch.
+    for (EdgeUpdate<Point2D> u : updates) {
+      knownMap.setTraversalCost(u.from, u.to, u.newCost);
+    }
+
     return updates;
   }
 }

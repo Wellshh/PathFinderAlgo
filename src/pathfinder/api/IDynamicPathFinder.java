@@ -12,6 +12,9 @@ import pathfinder.model.Point;
  */
 public interface IDynamicPathFinder<P extends Point> extends IPathFinder<P> {
 
+  /** Advances the algorithm's start position to the robot's current location. */
+  void setStart(P newStart);
+
   /** Update all edge costs, call {@link notifyEdgeCostChange} internally. */
   void updateAllEdgeCosts(List<EdgeUpdate<P>> edgeUpdates);
 

@@ -15,6 +15,8 @@ public class StatisticsPanel extends GridPane {
   private final Label nameBLabel = new Label("-");
   private final Label timeALabel = new Label("-");
   private final Label timeBLabel = new Label("-");
+  private final Label replanALabel = new Label("-");
+  private final Label replanBLabel = new Label("-");
   private final Label pathALabel = new Label("-");
   private final Label pathBLabel = new Label("-");
 
@@ -44,9 +46,13 @@ public class StatisticsPanel extends GridPane {
     add(timeALabel, 1, 3);
     add(timeBLabel, 2, 3);
 
-    add(new Label("Path Length:"), 0, 4);
-    add(pathALabel, 1, 4);
-    add(pathBLabel, 2, 4);
+    add(new Label("Replan Time:"), 0, 4);
+    add(replanALabel, 1, 4);
+    add(replanBLabel, 2, 4);
+
+    add(new Label("Path Length:"), 0, 5);
+    add(pathALabel, 1, 5);
+    add(pathBLabel, 2, 5);
   }
 
   private void bindMetrics(SimulationConfigModel config) {
@@ -58,10 +64,13 @@ public class StatisticsPanel extends GridPane {
     if (m == null) {
       nameALabel.setText("-");
       timeALabel.setText("-");
+      replanALabel.setText("-");
       pathALabel.setText("-");
     } else {
       nameALabel.setText(m.algorithmName());
       timeALabel.setText(String.format("%.3f ms", m.computeTimeMs()));
+      replanALabel.setText(
+          m.replanTimeNanos() > 0 ? String.format("%.3f ms", m.replanTimeMs()) : "-");
       pathALabel.setText(m.pathLength() > 0 ? String.valueOf(m.pathLength()) : "No path");
     }
   }
@@ -70,10 +79,13 @@ public class StatisticsPanel extends GridPane {
     if (m == null) {
       nameBLabel.setText("-");
       timeBLabel.setText("-");
+      replanBLabel.setText("-");
       pathBLabel.setText("-");
     } else {
       nameBLabel.setText(m.algorithmName());
       timeBLabel.setText(String.format("%.3f ms", m.computeTimeMs()));
+      replanBLabel.setText(
+          m.replanTimeNanos() > 0 ? String.format("%.3f ms", m.replanTimeMs()) : "-");
       pathBLabel.setText(m.pathLength() > 0 ? String.valueOf(m.pathLength()) : "No path");
     }
   }

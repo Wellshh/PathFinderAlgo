@@ -49,7 +49,7 @@ public class BattleEngine<P extends Point> {
       long elapsed = System.nanoTime() - t0;
 
       int pathLen = slot.getPathFinder().getPath().size();
-      AlgorithmMetrics metrics = new AlgorithmMetrics(slot.getName(), elapsed, pathLen);
+      AlgorithmMetrics metrics = new AlgorithmMetrics(slot.getName(), elapsed, 0, pathLen);
       slot.setLastMetrics(metrics);
 
       results.add(metrics);

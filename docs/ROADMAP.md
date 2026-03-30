@@ -22,6 +22,7 @@
 ### Visulization
 - [ ] Add configurable GUI
 - [ ] Add robot timeline to visualize movement
+  - [ ] Reset function
 
 ### Template
 - [ ] Templating all data types
