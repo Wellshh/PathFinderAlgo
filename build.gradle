@@ -1,0 +1,57 @@
+// SPDX-License-Identifier: ISC
+// Copyright (c) 2026 Wellshh
+
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+    id 'com.diffplug.spotless' version '6.25.0'
+}
+
+group = 'pathfinder'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    modularity.inferModulePath = true
+}
+
+sourceSets {
+    main.java.srcDirs = ['src']
+    test.java.srcDirs = ['test']
+    test.resources.srcDirs = ['test']
+}
+
+repositories {
+    mavenCentral()
+}
+
+javafx {
+    version = '17.0.15'
+    modules = ['javafx.controls', 'javafx.graphics']
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+spotless {
+    java {
+        target 'src/**/*.java', 'test/**/*.java'
+        googleJavaFormat('1.22.0')
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+application {
+    mainModule = 'PathFinderAlgo'
+    // mainClass = 'pathfinder.visualizer.javafx.DStarLiteDemo'
+    mainClass = 'pathfinder.visualizer.javafx.MultiAlgoDemo'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

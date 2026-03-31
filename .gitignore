@@ -1,6 +1,19 @@
+# Editor
+.vscode/
+.cursor/
+.DS_Store
+
+# Build
 bin/
+bin-test/
+lib/
 .specstory/
 .settings/
 .classpath
 .project
+out/
+output*.txt
 
+# Gradle
+.gradle/
+build/
