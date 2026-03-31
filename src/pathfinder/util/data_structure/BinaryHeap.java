@@ -81,15 +81,17 @@ public class BinaryHeap<T extends Comparable<? super T>> {
   }
 
   protected int percolateUp(int index) {
-    while ((index > 0) && (index - 1) / 2 >= 0) {
+    while (index > 0) {
       int parentIndex = (index - 1) / 2;
       // For min-heap: swap when child < parent (higher priority is smaller).
       // For max-heap: swap when child > parent (higher priority is larger).
       int cmp = compareItemsAt(index, parentIndex);
       if ((!isMaxHeap && cmp < 0) || (isMaxHeap && cmp > 0)) {
         swapItemsAt(index, parentIndex);
+        index = parentIndex;
+      } else {
+        break;
       }
-      index = parentIndex;
     }
 
     return index;

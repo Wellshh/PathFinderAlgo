@@ -17,6 +17,7 @@ import pathfinder.model.EdgeUpdate;
 import pathfinder.model.Environment;
 import pathfinder.model.IEnvironmentSensor;
 import pathfinder.model.Point;
+import pathfinder.model.Point2D;
 
 /**
  * UI-agnostic simulation engine that drives the sense-replan-move loop for each registered
@@ -32,19 +33,22 @@ public class SimulationRunner<P extends Point> {
 
   private final P goal;
 
+  private final SimulationPointAdapter<P> pointAdapter;
+
   private final Map<AlgorithmSlot<P>, SlotContext<P>> contexts = new HashMap<>();
 
   private Consumer<AlgorithmSlot<P>> onMetricsUpdated;
   private BiConsumer<AlgorithmSlot<P>, List<EdgeUpdate<P>>> onEnvironmentDiscovered;
 
-  public SimulationRunner(P goal) {
+  public SimulationRunner(P goal, SimulationPointAdapter<P> pointAdapter) {
     this.goal = goal;
+    this.pointAdapter = pointAdapter;
   }
 
   /** Register a slot with its dedicated known map and sensor. */
   public void registerSlot(
       AlgorithmSlot<P> slot, Environment<P> knownMap, IEnvironmentSensor<P> sensor) {
-    P startPos = intToPoint(slot.getRobot());
+    P startPos = pointAdapter.fromRobot(slot.getRobot());
     contexts.put(slot, new SlotContext<>(knownMap, sensor, startPos));
   }
 
@@ -98,12 +102,12 @@ public class SimulationRunner<P extends Point> {
     }
 
     ctx.currentPos = next;
-    slot.getRobot().setTarget(toDoubleX(next), toDoubleY(next));
+    Point2D nextCell = pointAdapter.toPoint2D(next);
+    slot.getRobot().setTarget(nextCell.x, nextCell.y);
 
     // 4. Publish updated path visualization
-    @SuppressWarnings("unchecked")
-    List<pathfinder.model.Point2D> pathPoints =
-        (List<pathfinder.model.Point2D>) (List<?>) slot.getPathFinder().getPath().toList();
+    List<Point2D> pathPoints =
+        pointAdapter.pathToDisplayPoints(slot.getPathFinder().getPath().toList());
     slot.getStateLayer().updatePath(pathPoints);
   }
 
@@ -142,21 +146,6 @@ public class SimulationRunner<P extends Point> {
     if (onEnvironmentDiscovered != null) {
       onEnvironmentDiscovered.accept(slot, updates);
     }
-  }
-
-  @SuppressWarnings("unchecked")
-  private P intToPoint(pathfinder.visualizer.model.RobotEntity robot) {
-    return (P) new pathfinder.model.Point2D((int) robot.getCurrentX(), (int) robot.getCurrentY());
-  }
-
-  private double toDoubleX(P point) {
-    if (point instanceof pathfinder.model.Point2D p2d) return p2d.x;
-    throw new UnsupportedOperationException("Unknown point type: " + point.getClass());
-  }
-
-  private double toDoubleY(P point) {
-    if (point instanceof pathfinder.model.Point2D p2d) return p2d.y;
-    throw new UnsupportedOperationException("Unknown point type: " + point.getClass());
   }
 
   /** Per-slot mutable state held by the runner. */

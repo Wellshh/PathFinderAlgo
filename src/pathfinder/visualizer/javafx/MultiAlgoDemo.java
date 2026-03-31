@@ -23,6 +23,7 @@ import pathfinder.engine.AlgorithmSlot;
 import pathfinder.engine.AllParallelScheduler;
 import pathfinder.engine.BattleEngine;
 import pathfinder.engine.SimulationController;
+import pathfinder.engine.SimulationPointAdapter;
 import pathfinder.engine.SimulationRunner;
 import pathfinder.factory.AlgorithmFactory;
 import pathfinder.factory.AlgorithmType;
@@ -194,7 +195,7 @@ public class MultiAlgoDemo extends Application {
   }
 
   private void setupSimulationRunner() {
-    simRunner = new SimulationRunner<>(goal);
+    simRunner = new SimulationRunner<>(goal, SimulationPointAdapter.forPoint2D());
 
     SimpleGridSensor sensorA = new SimpleGridSensor(groundTruth, knownMapA, SENSE_RADIUS);
     SimpleGridSensor sensorB = new SimpleGridSensor(groundTruth, knownMapB, SENSE_RADIUS);
