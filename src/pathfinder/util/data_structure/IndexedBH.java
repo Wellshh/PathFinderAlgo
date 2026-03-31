@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Wellshh
+ *
+ * SPDX-License-Identifier: ISC
+ */
+
 package pathfinder.util.data_structure;
 
 import java.util.HashMap;

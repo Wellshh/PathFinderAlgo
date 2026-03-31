@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Wellshh
+ *
+ * SPDX-License-Identifier: ISC
+ */
+
 module PathFinderAlgo {
   requires transitive javafx.base;
   requires javafx.controls;

@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Wellshh
+ *
+ * SPDX-License-Identifier: ISC
+ */
+
 package pathfinder.visualizer.javafx;
 
 import javafx.collections.FXCollections;
@@ -39,6 +45,7 @@ public class ControlPanel extends VBox {
   private final Button battleBtn = new Button("Start Battle");
 
   private Runnable onBattleRequested;
+  private Runnable onResetRequested;
 
   public ControlPanel(SimulationConfigModel config) {
     this.config = config;
@@ -50,6 +57,11 @@ public class ControlPanel extends VBox {
   /** Register a callback invoked when the user clicks "Start Battle". */
   public void setOnBattleRequested(Runnable handler) {
     this.onBattleRequested = handler;
+  }
+
+  /** Register a callback invoked when the user clicks "Reset". */
+  public void setOnResetRequested(Runnable handler) {
+    this.onResetRequested = handler;
   }
 
   private void buildLayout() {
@@ -150,7 +162,12 @@ public class ControlPanel extends VBox {
         });
 
     stopBtn.setOnAction(e -> config.requestStop());
-    resetBtn.setOnAction(e -> config.requestReset());
+    resetBtn.setOnAction(
+        e -> {
+          if (onResetRequested != null) {
+            onResetRequested.run();
+          }
+        });
 
     battleBtn.setOnAction(
         e -> {

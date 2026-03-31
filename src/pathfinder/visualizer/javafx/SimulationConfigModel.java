@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Wellshh
+ *
+ * SPDX-License-Identifier: ISC
+ */
+
 package pathfinder.visualizer.javafx;
 
 import java.util.function.Consumer;
@@ -14,14 +20,10 @@ import pathfinder.engine.SimulationState;
 import pathfinder.factory.AlgorithmType;
 
 /**
- * JavaFX-backed implementation of {@link ISimulationConfig}. All properties are
- * JavaFX observable
- * properties, enabling bidirectional binding with UI controls (sliders, toggle
- * buttons, etc.).
+ * JavaFX-backed implementation of {@link ISimulationConfig}. All properties are JavaFX observable
+ * properties, enabling bidirectional binding with UI controls (sliders, toggle buttons, etc.).
  *
- * <p>
- * Changes are automatically forwarded to the bound
- * {@link SimulationController}.
+ * <p>Changes are automatically forwarded to the bound {@link SimulationController}.
  */
 public class SimulationConfigModel implements ISimulationConfig {
 
@@ -29,13 +31,16 @@ public class SimulationConfigModel implements ISimulationConfig {
 
   private final DoubleProperty playbackSpeed = new SimpleDoubleProperty(1.0);
   private final DoubleProperty logicTicksPerSecond = new SimpleDoubleProperty(10.0);
-  private final ObjectProperty<SimulationState> simulationState = new SimpleObjectProperty<>(SimulationState.IDLE);
+  private final ObjectProperty<SimulationState> simulationState =
+      new SimpleObjectProperty<>(SimulationState.IDLE);
   private final BooleanProperty showOpenList = new SimpleBooleanProperty(true);
   private final BooleanProperty showClosedList = new SimpleBooleanProperty(true);
 
   // Battle mode properties (UI-specific, not part of ISimulationConfig)
-  private final ObjectProperty<AlgorithmType> selectedAlgorithmA = new SimpleObjectProperty<>(AlgorithmType.ASTAR);
-  private final ObjectProperty<AlgorithmType> selectedAlgorithmB = new SimpleObjectProperty<>(AlgorithmType.DSTAR_LITE);
+  private final ObjectProperty<AlgorithmType> selectedAlgorithmA =
+      new SimpleObjectProperty<>(AlgorithmType.ASTAR);
+  private final ObjectProperty<AlgorithmType> selectedAlgorithmB =
+      new SimpleObjectProperty<>(AlgorithmType.DSTAR_LITE);
   private final BooleanProperty battleModeEnabled = new SimpleBooleanProperty(false);
   private final ObjectProperty<AlgorithmMetrics> metricsA = new SimpleObjectProperty<>();
   private final ObjectProperty<AlgorithmMetrics> metricsB = new SimpleObjectProperty<>();

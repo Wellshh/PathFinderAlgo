@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Wellshh
+ *
+ * SPDX-License-Identifier: ISC
+ */
+
 package pathfinder.visualizer.javafx;
 
 import java.util.List;
@@ -103,6 +109,7 @@ public class MultiAlgoDemo extends Application {
 
     ControlPanel controlPanel = new ControlPanel(configModel);
     controlPanel.setOnBattleRequested(() -> algorithmExecutor.submit(this::runInitialBattle));
+    controlPanel.setOnResetRequested(() -> algorithmExecutor.submit(this::doFullReset));
 
     StatisticsPanel statsPanel = new StatisticsPanel(configModel);
 
@@ -136,8 +143,8 @@ public class MultiAlgoDemo extends Application {
   }
 
   /**
-   * AnimationTimer that pumps {@link SimulationController#onRenderTick(double)} every frame.
-   * This is the single driver for both logic ticks (simulation steps) and render callbacks.
+   * AnimationTimer that pumps {@link SimulationController#onRenderTick(double)} every frame. This
+   * is the single driver for both logic ticks (simulation steps) and render callbacks.
    */
   private void createTickPump() {
     tickPump =
@@ -170,21 +177,20 @@ public class MultiAlgoDemo extends Application {
     knownMapB = copyEnvironment(groundTruth);
 
     IPathFinder<Point2D> pfA = AlgorithmFactory.createPathFinder(typeA);
-    AlgorithmStateLayer layerA =
-        viewModel.addAlgorithmLayer(typeA.getDisplayName(), COLOR_ALGO_A);
+    AlgorithmStateLayer layerA = viewModel.addAlgorithmLayer(typeA.getDisplayName(), COLOR_ALGO_A);
     layerA.setAlpha(0.6);
     RobotEntity robotA = viewModel.addRobot("robot-A", COLOR_ALGO_A, start.x, start.y);
     slotA = new AlgorithmSlot<>(typeA.getDisplayName(), pfA, layerA, robotA);
 
     IPathFinder<Point2D> pfB = AlgorithmFactory.createPathFinder(typeB);
-    AlgorithmStateLayer layerB =
-        viewModel.addAlgorithmLayer(typeB.getDisplayName(), COLOR_ALGO_B);
+    AlgorithmStateLayer layerB = viewModel.addAlgorithmLayer(typeB.getDisplayName(), COLOR_ALGO_B);
     layerB.setAlpha(0.6);
     RobotEntity robotB = viewModel.addRobot("robot-B", COLOR_ALGO_B, start.x, start.y);
     slotB = new AlgorithmSlot<>(typeB.getDisplayName(), pfB, layerB, robotB);
 
     setupSimulationRunner();
     syncViewModelFromGroundTruth();
+    viewModel.markAllDirty();
   }
 
   private void setupSimulationRunner() {
@@ -211,6 +217,32 @@ public class MultiAlgoDemo extends Application {
           rebuildSlots();
           runInitialBattle();
         });
+  }
+
+  // -------------------- Reset --------------------
+
+  /**
+   * Full reset: restores groundTruth to its initial state, rebuilds all algorithm slots and sensors
+   * from scratch, re-runs the initial battle, and returns the controller to IDLE. Safe to call from
+   * any thread (all UI work is dispatched via Platform.runLater inside the callees).
+   */
+  private void doFullReset() {
+    simController.reset();
+    clearGroundTruth();
+    placeSampleWall();
+    rebuildSlots();
+    runInitialBattle();
+    Platform.runLater(
+        () -> statusBar.setText("Reset complete — click obstacles or press Start to simulate"));
+  }
+
+  /** Remove every obstacle from groundTruth, leaving a blank grid. */
+  private void clearGroundTruth() {
+    for (int y = 0; y < GRID_H; y++) {
+      for (int x = 0; x < GRID_W; x++) {
+        groundTruth.removeObstacle(x, y);
+      }
+    }
   }
 
   // -------------------- Environment setup --------------------

@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Wellshh
+ *
+ * SPDX-License-Identifier: ISC
+ */
+
 package pathfinder.algorithm.dstarlite;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,8 +19,8 @@ import pathfinder.testenv.environment.Grid2DEnvironment;
 import pathfinder.testenv.sensor.SimpleGridSensor;
 
 /**
- * TDD regression tests for D* Lite dynamic replan. These tests reproduce the "No path" bug
- * observed in the Multi-Algorithm Battle Demo when obstacles are added at runtime.
+ * TDD regression tests for D* Lite dynamic replan. These tests reproduce the "No path" bug observed
+ * in the Multi-Algorithm Battle Demo when obstacles are added at runtime.
  *
  * <p>Strategy: each test creates a scenario where a valid path MUST exist, performs incremental D*
  * Lite replan, and asserts the path is found. Failure means the incremental mechanism is broken.
@@ -138,8 +144,7 @@ class DStarLiteDynamicReplanBugTest {
         pf.updateAllEdgeCosts(updates);
         pf.computePath();
 
-        assertFalse(
-            pf.getPath().isEmpty(), "Path must exist (top/bottom open) after wall y=" + y);
+        assertFalse(pf.getPath().isEmpty(), "Path must exist (top/bottom open) after wall y=" + y);
         assertIncrementalMatchesFresh(pf, env, start, goal, "wall y=" + y);
       }
     }
@@ -172,8 +177,7 @@ class DStarLiteDynamicReplanBugTest {
         assertFalse(
             pf.getPath().isEmpty(),
             "Path must exist (top open) after obstacle (" + c[0] + "," + c[1] + ")");
-        assertIncrementalMatchesFresh(
-            pf, env, start, goal, "obstacle (" + c[0] + "," + c[1] + ")");
+        assertIncrementalMatchesFresh(pf, env, start, goal, "obstacle (" + c[0] + "," + c[1] + ")");
       }
     }
   }
@@ -213,8 +217,7 @@ class DStarLiteDynamicReplanBugTest {
           pf.computePath();
 
           assertFalse(
-              pf.getPath().isEmpty(),
-              "Path must exist at step " + step + " pos=" + robotPos);
+              pf.getPath().isEmpty(), "Path must exist at step " + step + " pos=" + robotPos);
           assertIncrementalMatchesFresh(
               pf, knownMap, robotPos, goal, "step " + step + " pos=" + robotPos);
         }
@@ -317,8 +320,7 @@ class DStarLiteDynamicReplanBugTest {
       assertFalse(
           pf.getPath().isEmpty(),
           "Path must exist from " + robotPos + " (top/bottom open, wall at x=" + wallX + ")");
-      assertIncrementalMatchesFresh(
-          pf, env, robotPos, goal, "mid-grid wall x=" + wallX);
+      assertIncrementalMatchesFresh(pf, env, robotPos, goal, "mid-grid wall x=" + wallX);
     }
 
     @Test
@@ -407,9 +409,7 @@ class DStarLiteDynamicReplanBugTest {
         pf.updateAllEdgeCosts(updates);
         pf.computePath();
 
-        assertFalse(
-            pf.getPath().isEmpty(),
-            "Path must exist (gap at y=8-9) after wall at y=" + y);
+        assertFalse(pf.getPath().isEmpty(), "Path must exist (gap at y=8-9) after wall at y=" + y);
       }
 
       // Walk some more
@@ -426,11 +426,8 @@ class DStarLiteDynamicReplanBugTest {
         pf.updateAllEdgeCosts(updates);
         pf.computePath();
 
-        assertFalse(
-            pf.getPath().isEmpty(),
-            "Path must exist (top/bottom open) after wall2 y=" + y);
-        assertIncrementalMatchesFresh(
-            pf, env, robotPos, goal, "wall2 y=" + y);
+        assertFalse(pf.getPath().isEmpty(), "Path must exist (top/bottom open) after wall2 y=" + y);
+        assertIncrementalMatchesFresh(pf, env, robotPos, goal, "wall2 y=" + y);
       }
     }
   }

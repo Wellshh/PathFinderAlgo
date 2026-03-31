@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026 Wellshh
+ *
+ * SPDX-License-Identifier: ISC
+ */
+
 package pathfinder.algorithm.astar;
 
 import static org.junit.jupiter.api.Assertions.*;

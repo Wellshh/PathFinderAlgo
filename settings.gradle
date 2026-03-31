@@ -1,1 +1,4 @@
+// SPDX-License-Identifier: ISC
+// Copyright (c) 2026 Wellshh
+
 rootProject.name = 'PathFinderAlgo'
