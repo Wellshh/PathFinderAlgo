@@ -11,6 +11,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.logging.Logger;
 import pathfinder.api.IPathFinder;
 import pathfinder.api.PathContainer;
 import pathfinder.api.PathContainer.O1PathContainer;
@@ -31,6 +32,8 @@ import pathfinder.util.data_structure.IndexedBH;
  * @author Junyan Bai
  */
 public class AStarPathFinder<P extends Point> implements IPathFinder<P> {
+  private static final Logger logger = Logger.getLogger(AStarPathFinder.class.getName());
+
   private Environment<P> env;
   private O1PathContainer<P> path = new O1PathContainer<>();
 
@@ -150,7 +153,7 @@ public class AStarPathFinder<P extends Point> implements IPathFinder<P> {
         }
       }
     }
-    System.out.println("[A*]: No path found");
+    logger.fine("[A*]: No path found");
   }
 
   /** Build optimal path by backtracking through the parent pointer */

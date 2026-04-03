@@ -9,6 +9,7 @@ package pathfinder.testenv.visualizer;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Logger;
 import pathfinder.model.Environment;
 import pathfinder.model.Point2D;
 import pathfinder.testenv.environment.Grid2DEnvironment;
@@ -18,6 +19,7 @@ import pathfinder.testenv.environment.Grid2DEnvironment;
  * obstacle, S = start, G = goal, * = path, @ = robot position
  */
 public class ConsoleGridVisualizer implements ITestVisualizer<Point2D> {
+  private static final Logger logger = Logger.getLogger(ConsoleGridVisualizer.class.getName());
 
   private final int width;
   private final int height;
@@ -83,6 +85,6 @@ public class ConsoleGridVisualizer implements ITestVisualizer<Point2D> {
       sb.append('\n');
     }
 
-    System.out.println(sb);
+    logger.fine(sb.toString());
   }
 }

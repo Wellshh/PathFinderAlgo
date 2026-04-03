@@ -9,6 +9,7 @@ package pathfinder.algorithm.dstarlite;
 import java.util.HashMap;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.logging.Logger;
 import pathfinder.api.IDynamicPathFinder;
 import pathfinder.api.PathContainer;
 import pathfinder.api.PathContainer.O1PathContainer;
@@ -19,6 +20,8 @@ import pathfinder.model.node.DStarLiteNode;
 import pathfinder.util.UtilityFunc;
 
 public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<P> {
+  private static final Logger logger = Logger.getLogger(DStarLitePathFinder.class.getName());
+
   /* The map */
   private Environment<P> env;
   /* The planned path */
@@ -146,15 +149,15 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
       case EARLY_EXIT:
       case PQ_EMPTY:
       case SUCCESS:
-        System.out.printf("Path found -- compute return: %s \n", result);
+        logger.fine(String.format("Path found -- compute return: %s", result));
         path = buildPathAlongGradient();
         setPath(path);
         if (path.isEmpty()) {
-          System.out.println("No path found during buildPathAlongGradient!\n");
+          logger.fine("No path found during buildPathAlongGradient!");
         }
         break;
       case MAX_STEPS_REACHED:
-        System.out.printf("Max steps reached -- compute return: %s \n", result);
+        logger.fine(String.format("Max steps reached -- compute return: %s", result));
         path = new O1PathContainer<>();
         setPath(path);
         break;
@@ -301,7 +304,7 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
       if (!topPQ.lt(startNode) && startConsistent) break;
 
       if (loop_cnt++ > maxSteps) {
-        System.out.println("Maxsteps is reached during computeShortestPath!");
+        logger.fine("Maxsteps is reached during computeShortestPath!");
         return ComputeReturn.MAX_STEPS_REACHED;
       }
 
@@ -402,7 +405,7 @@ public class DStarLitePathFinder<P extends Point> implements IDynamicPathFinder<
     int safetyCounter = 0;
     while (!current.equals(goalPos)) {
       if (safetyCounter++ > maxSteps) {
-        System.out.println("Max steps reached during buildPathAlongGradient!");
+        logger.fine("Max steps reached during buildPathAlongGradient!");
         path.clear();
         return path;
       }

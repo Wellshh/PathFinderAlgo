@@ -8,6 +8,7 @@ module PathFinderAlgo {
   requires transitive javafx.base;
   requires javafx.controls;
   requires javafx.graphics;
+  requires java.logging;
 
   exports pathfinder.api;
   exports pathfinder.engine;
